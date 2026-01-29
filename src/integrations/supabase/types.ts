@@ -1028,6 +1028,8 @@ export type Database = {
       orders: {
         Row: {
           amount: number | null
+          amount_idr: number | null
+          amount_usd: number | null
           billing_cycle: string | null
           created_at: string
           customer_email: string | null
@@ -1035,11 +1037,23 @@ export type Database = {
           design: string | null
           domain: string
           id: string
+          midtrans_fraud_status: string | null
+          midtrans_order_id: string | null
+          midtrans_payment_type: string | null
+          midtrans_redirect_url: string | null
+          midtrans_transaction_id: string | null
+          midtrans_transaction_status: string | null
+          payment_env: string | null
+          payment_provider: string | null
+          promo_code: string | null
           status: string | null
+          subscription_years: number | null
           user_id: string | null
         }
         Insert: {
           amount?: number | null
+          amount_idr?: number | null
+          amount_usd?: number | null
           billing_cycle?: string | null
           created_at?: string
           customer_email?: string | null
@@ -1047,11 +1061,23 @@ export type Database = {
           design?: string | null
           domain: string
           id?: string
+          midtrans_fraud_status?: string | null
+          midtrans_order_id?: string | null
+          midtrans_payment_type?: string | null
+          midtrans_redirect_url?: string | null
+          midtrans_transaction_id?: string | null
+          midtrans_transaction_status?: string | null
+          payment_env?: string | null
+          payment_provider?: string | null
+          promo_code?: string | null
           status?: string | null
+          subscription_years?: number | null
           user_id?: string | null
         }
         Update: {
           amount?: number | null
+          amount_idr?: number | null
+          amount_usd?: number | null
           billing_cycle?: string | null
           created_at?: string
           customer_email?: string | null
@@ -1059,7 +1085,17 @@ export type Database = {
           design?: string | null
           domain?: string
           id?: string
+          midtrans_fraud_status?: string | null
+          midtrans_order_id?: string | null
+          midtrans_payment_type?: string | null
+          midtrans_redirect_url?: string | null
+          midtrans_transaction_id?: string | null
+          midtrans_transaction_status?: string | null
+          payment_env?: string | null
+          payment_provider?: string | null
+          promo_code?: string | null
           status?: string | null
+          subscription_years?: number | null
           user_id?: string | null
         }
         Relationships: []
