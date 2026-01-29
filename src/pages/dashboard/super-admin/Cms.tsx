@@ -408,6 +408,16 @@ export default function SuperAdminCms() {
           onSelectedEnvChange={midtrans.setSelectedEnv}
           onSaveSelectedEnv={midtrans.onSaveSelectedEnv}
           onRefresh={midtrans.onRefresh}
+
+          apiKeysEnv={midtrans.apiKeysEnv}
+          onApiKeysEnvChange={midtrans.setApiKeysEnv}
+          merchantIdValue={midtrans.merchantIdValue}
+          onMerchantIdChange={midtrans.setMerchantIdValue}
+          clientKeyValue={midtrans.clientKeyValue}
+          onClientKeyChange={midtrans.setClientKeyValue}
+          serverKeyValue={midtrans.serverKeyValue}
+          onServerKeyChange={midtrans.setServerKeyValue}
+          onSaveApiKeys={midtrans.onSaveApiKeys}
         />
 
         <Card>

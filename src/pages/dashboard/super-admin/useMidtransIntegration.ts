@@ -28,6 +28,7 @@ type GetResponse = {
 };
 
 type SetActiveEnvResponse = { ok: boolean; active_env: MidtransEnv };
+type SetKeysResponse = { ok: boolean };
 
 export function useMidtransIntegration({ navigate }: { navigate: NavigateFunction }) {
   const [loading, setLoading] = useState(false);
@@ -41,6 +42,11 @@ export function useMidtransIntegration({ navigate }: { navigate: NavigateFunctio
   });
 
   const [selectedEnv, setSelectedEnv] = useState<MidtransEnv>("production");
+
+  const [apiKeysEnv, setApiKeysEnv] = useState<MidtransEnv>("production");
+  const [merchantIdValue, setMerchantIdValue] = useState("");
+  const [clientKeyValue, setClientKeyValue] = useState("");
+  const [serverKeyValue, setServerKeyValue] = useState("");
 
   const fetchStatus = async () => {
     setLoading(true);
@@ -73,6 +79,9 @@ export function useMidtransIntegration({ navigate }: { navigate: NavigateFunctio
       if (active === "sandbox" || active === "production") {
         setSelectedEnv(active);
       }
+
+      const merchantId = String(((data as any)?.merchant_id ?? "") as any).trim();
+      if (merchantId) setMerchantIdValue(merchantId);
     } catch (e: any) {
       console.error(e);
       if (String(e?.message ?? "").toLowerCase().includes("unauthorized")) {
@@ -109,6 +118,48 @@ export function useMidtransIntegration({ navigate }: { navigate: NavigateFunctio
     }
   };
 
+  const normalizeMerchantId = (input: string) => {
+    const v = String(input ?? "").trim();
+    if (!v) throw new Error("Merchant ID wajib diisi.");
+    if (!/^[A-Za-z0-9_-]{3,64}$/.test(v)) throw new Error("Format Merchant ID tidak valid.");
+    return v;
+  };
+
+  const normalizeKey = (input: string, label: string) => {
+    const v = String(input ?? "").trim();
+    if (!v) throw new Error(`${label} wajib diisi.`);
+    if (/\s/.test(v) || v.length < 8) throw new Error(`${label} tidak valid.`);
+    return v;
+  };
+
+  const onSaveApiKeys = async () => {
+    setLoading(true);
+    try {
+      const merchant_id = normalizeMerchantId(merchantIdValue);
+      const client_key = normalizeKey(clientKeyValue, "Client Key");
+      const server_key = normalizeKey(serverKeyValue, "Server Key");
+
+      const { error } = await invokeWithAuth<SetKeysResponse>(SETTINGS_FN, {
+        action: "set",
+        env: apiKeysEnv,
+        merchant_id,
+        client_key,
+        server_key,
+      });
+      if (error) throw error;
+
+      setClientKeyValue("");
+      setServerKeyValue("");
+      toast.success(`Midtrans API keys (${apiKeysEnv}) berhasil disimpan.`);
+      await fetchStatus();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || "Unable to save Midtrans API keys.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return useMemo(
     () => ({
       loading,
@@ -117,8 +168,18 @@ export function useMidtransIntegration({ navigate }: { navigate: NavigateFunctio
       setSelectedEnv,
       onSaveSelectedEnv,
       onRefresh: fetchStatus,
+
+      apiKeysEnv,
+      setApiKeysEnv,
+      merchantIdValue,
+      setMerchantIdValue,
+      clientKeyValue,
+      setClientKeyValue,
+      serverKeyValue,
+      setServerKeyValue,
+      onSaveApiKeys,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loading, status, selectedEnv],
+    [loading, status, selectedEnv, apiKeysEnv, merchantIdValue, clientKeyValue, serverKeyValue],
   );
 }

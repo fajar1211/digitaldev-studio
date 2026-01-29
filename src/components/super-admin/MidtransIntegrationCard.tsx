@@ -3,6 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RefreshCcw, Save, CreditCard } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export type MidtransEnv = "sandbox" | "production";
 
@@ -28,6 +30,16 @@ type Props = {
   onSelectedEnvChange: (env: MidtransEnv) => void;
   onSaveSelectedEnv: () => void;
   onRefresh: () => void;
+
+  apiKeysEnv: MidtransEnv;
+  onApiKeysEnvChange: (env: MidtransEnv) => void;
+  merchantIdValue: string;
+  onMerchantIdChange: (value: string) => void;
+  clientKeyValue: string;
+  onClientKeyChange: (value: string) => void;
+  serverKeyValue: string;
+  onServerKeyChange: (value: string) => void;
+  onSaveApiKeys: () => void;
 };
 
 export function MidtransIntegrationCard({
@@ -37,6 +49,15 @@ export function MidtransIntegrationCard({
   onSelectedEnvChange,
   onSaveSelectedEnv,
   onRefresh,
+  apiKeysEnv,
+  onApiKeysEnvChange,
+  merchantIdValue,
+  onMerchantIdChange,
+  clientKeyValue,
+  onClientKeyChange,
+  serverKeyValue,
+  onServerKeyChange,
+  onSaveApiKeys,
 }: Props) {
   const configuredAny = Boolean(status.sandbox.configured || status.production.configured || status.merchantId);
 
@@ -88,6 +109,77 @@ export function MidtransIntegrationCard({
             <Button type="button" onClick={onSaveSelectedEnv} disabled={loading}>
               <Save className="h-4 w-4 mr-2" /> Simpan
             </Button>
+          </div>
+
+          <div className="rounded-md border bg-muted/30 p-3">
+            <div className="text-xs font-medium text-foreground">API Keys Midtrans</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Merchant ID bersifat global. Client Key & Server Key disimpan per environment.
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <div className="space-y-1.5">
+                <div className="text-xs text-muted-foreground">Konfigurasi untuk environment</div>
+                <Select value={apiKeysEnv} onValueChange={(v) => onApiKeysEnvChange(v as MidtransEnv)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih environment" />
+                  </SelectTrigger>
+                  <SelectContent className="z-50 bg-popover">
+                    <SelectItem value="sandbox">Sandbox</SelectItem>
+                    <SelectItem value="production">Production</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="midtrans-merchant-id">Merchant ID</Label>
+                <Input
+                  id="midtrans-merchant-id"
+                  value={merchantIdValue}
+                  onChange={(e) => onMerchantIdChange(e.target.value)}
+                  placeholder={status.merchantId || "Masukkan Merchant ID"}
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="midtrans-client-key">Client Key ({apiKeysEnv})</Label>
+                <Input
+                  id="midtrans-client-key"
+                  value={clientKeyValue}
+                  onChange={(e) => onClientKeyChange(e.target.value)}
+                  placeholder={
+                    apiKeysEnv === "sandbox"
+                      ? status.sandbox.clientKeyMasked || "Masukkan Client Key"
+                      : status.production.clientKeyMasked || "Masukkan Client Key"
+                  }
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="midtrans-server-key">Server Key ({apiKeysEnv})</Label>
+                <Input
+                  id="midtrans-server-key"
+                  type="password"
+                  value={serverKeyValue}
+                  onChange={(e) => onServerKeyChange(e.target.value)}
+                  placeholder={
+                    apiKeysEnv === "sandbox"
+                      ? status.sandbox.serverKeyMasked || "Masukkan Server Key"
+                      : status.production.serverKeyMasked || "Masukkan Server Key"
+                  }
+                  autoComplete="new-password"
+                />
+                <div className="text-[11px] text-muted-foreground">Server key disembunyikan (tidak ditampilkan penuh).</div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" onClick={onSaveApiKeys} disabled={loading}>
+                  <Save className="h-4 w-4 mr-2" /> Simpan API Key
+                </Button>
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
