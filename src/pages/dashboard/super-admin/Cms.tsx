@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { BarChart3, CreditCard, Mail, KeyRound, Webhook } from "lucide-react";
+import { Mail, KeyRound } from "lucide-react";
 import { DomainDuckIntegrationCard, type DomainDuckTestResult } from "@/components/super-admin/DomainDuckIntegrationCard";
 import { Ga4IntegrationCard } from "@/components/super-admin/Ga4IntegrationCard";
 import { GscIntegrationCard } from "@/components/super-admin/GscIntegrationCard";
@@ -18,6 +18,8 @@ import { RobotsTxtIntegrationCard } from "@/components/super-admin/RobotsTxtInte
 import { useRobotsTxtIntegration } from "@/pages/dashboard/super-admin/useRobotsTxtIntegration";
 import { SchemaIntegrationCard } from "@/components/super-admin/SchemaIntegrationCard";
 import { useSchemaIntegration } from "@/pages/dashboard/super-admin/useSchemaIntegration";
+import { MidtransIntegrationCard } from "@/components/super-admin/MidtransIntegrationCard";
+import { useMidtransIntegration } from "@/pages/dashboard/super-admin/useMidtransIntegration";
 
 const GSC_SETTINGS_FN = "super-admin-gsc-settings";
 
@@ -28,6 +30,7 @@ export default function SuperAdminCms() {
   const sitemap = useSitemapIntegration({ navigate });
   const robots = useRobotsTxtIntegration({ navigate });
   const schema = useSchemaIntegration({ navigate });
+  const midtrans = useMidtransIntegration({ navigate });
 
   const [domainduckKey, setDomainduckKey] = useState("");
   const [domainduckConfigured, setDomainduckConfigured] = useState(false);
@@ -398,27 +401,18 @@ export default function SuperAdminCms() {
 
         {/* Domain Lookup configured above (DomainDuck) */}
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between gap-3">
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4" /> Payment Gateway
-              </CardTitle>
-              <Badge variant="secondary">Planned</Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            Manage subscriptions, invoices, and payment webhooks.
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button variant="outline" disabled>
-                <KeyRound className="h-4 w-4 mr-2" /> Configure
-              </Button>
-              <Button variant="outline" disabled>
-                <Webhook className="h-4 w-4 mr-2" /> Webhooks
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <MidtransIntegrationCard
+          loading={midtrans.loading}
+          status={midtrans.status}
+          value={midtrans.value}
+          onChange={midtrans.onChange}
+          onSave={midtrans.onSave}
+          onRefresh={midtrans.onRefresh}
+          onClear={midtrans.onClear}
+          onRevealServerKey={midtrans.onRevealServerKey}
+          onHideServerKey={midtrans.onHideServerKey}
+          revealedServerKey={midtrans.revealedServerKey}
+        />
 
         <Card>
           <CardHeader>
