@@ -68,7 +68,8 @@ export default function Payment() {
   // Auto-apply promo as user types (debounced), so Est. price updates immediately.
   useEffect(() => {
     const code = promo.trim();
-    setPromoCode(code);
+    // Avoid update loops: only write to context when value actually changes.
+    if (code !== state.promoCode) setPromoCode(code);
 
     // Clear applied promo while typing / when empty
     if (!code || baseTotalUsd == null) {
@@ -91,7 +92,7 @@ export default function Payment() {
     }, 450);
 
     return () => window.clearTimeout(t);
-  }, [baseTotalUsd, promo, setAppliedPromo, setPromoCode]);
+  }, [baseTotalUsd, promo, setAppliedPromo, setPromoCode, state.promoCode]);
 
   const canComplete = useMemo(() => {
     return Boolean(
