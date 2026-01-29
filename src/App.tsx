@@ -15,6 +15,9 @@ import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
+import PaymentSuccess from "./pages/payment/PaymentSuccess";
+import PaymentPending from "./pages/payment/PaymentPending";
+import PaymentError from "./pages/payment/PaymentError";
 import UserDashboard from "./pages/dashboard/UserDashboard";
 import AssistDashboard from "./pages/dashboard/AssistDashboard";
 import SuperAdminLogin from "./pages/super-admin/SuperAdminLogin";
@@ -65,6 +68,11 @@ const App = () => (
             <Route path="/contact" element={<Contact />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/auth/reset-password" element={<ResetPassword />} />
+
+             {/* Midtrans redirect pages */}
+             <Route path="/payment/success" element={<PaymentSuccess />} />
+             <Route path="/payment/pending" element={<PaymentPending />} />
+             <Route path="/payment/error" element={<PaymentError />} />
 
             {/* Super Admin */}
             <Route path="/super-admin/login" element={<SuperAdminLogin />} />
