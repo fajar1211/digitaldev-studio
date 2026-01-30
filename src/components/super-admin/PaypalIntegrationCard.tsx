@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RefreshCcw, Save, Wallet } from "lucide-react";
+import { RefreshCcw, Save, Trash2, Wallet } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export type PaypalEnv = "sandbox" | "production";
@@ -22,6 +22,8 @@ type Props = {
   activeEnv: PaypalEnv;
   onActiveEnvChange: (env: PaypalEnv) => void;
   onSaveActiveEnv: () => void;
+
+  onResetEnv: (env: PaypalEnv) => void;
 
   clientIdEnv: PaypalEnv;
   onClientIdEnvChange: (env: PaypalEnv) => void;
@@ -44,6 +46,7 @@ export function PaypalIntegrationCard({
   activeEnv,
   onActiveEnvChange,
   onSaveActiveEnv,
+  onResetEnv,
   clientIdEnv,
   onClientIdEnvChange,
   clientIdValue,
@@ -92,6 +95,17 @@ export function PaypalIntegrationCard({
               <Save className="h-4 w-4 mr-2" /> Simpan
             </Button>
           </div>
+
+          {!ready ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="destructive" onClick={() => onResetEnv(activeEnv)} disabled={loading}>
+                <Trash2 className="h-4 w-4 mr-2" /> Reset env {activeEnv}
+              </Button>
+              <div className="text-xs text-muted-foreground">
+                Menghapus Client ID + Client Secret untuk env yang dipilih.
+              </div>
+            </div>
+          ) : null}
 
           <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground space-y-2">
             <div className="flex flex-wrap items-center gap-2">
