@@ -24,11 +24,7 @@ export function usePaypalIntegration({ navigate }: { navigate: NavigateFunction 
 
   const [status, setStatus] = useState<PaypalStatus>({ activeEnv: null, sandboxReady: false, productionReady: false });
   const [activeEnv, setActiveEnv] = useState<PaypalEnv>("sandbox");
-
-  const [clientIdEnv, setClientIdEnv] = useState<PaypalEnv>("sandbox");
   const [clientIdValue, setClientIdValue] = useState("");
-
-  const [secretEnv, setSecretEnv] = useState<PaypalEnv>("sandbox");
   const [secretValue, setSecretValue] = useState("");
 
   const fetchStatus = async () => {
@@ -105,11 +101,12 @@ export function usePaypalIntegration({ navigate }: { navigate: NavigateFunction 
       if (!v) throw new Error("Client ID wajib diisi.");
       if (/\s/.test(v) || v.length < 8) throw new Error("Client ID tidak valid.");
 
-      const { error } = await invokeWithAuth(SETTINGS_FN, { action: "set_client_id", env: clientIdEnv, client_id: v });
+      // Use the single env dropdown (activeEnv) for Client ID & Secret.
+      const { error } = await invokeWithAuth(SETTINGS_FN, { action: "set_client_id", env: activeEnv, client_id: v });
       if (error) throw error;
 
       setClientIdValue("");
-      toast.success(`PayPal Client ID (${clientIdEnv}) tersimpan.`);
+      toast.success(`PayPal Client ID (${activeEnv}) tersimpan.`);
       await fetchStatus();
     } catch (e: any) {
       console.error(e);
@@ -127,11 +124,11 @@ export function usePaypalIntegration({ navigate }: { navigate: NavigateFunction 
       if (!v) throw new Error("Client Secret wajib diisi.");
       if (/\s/.test(v) || v.length < 8) throw new Error("Client Secret tidak valid.");
 
-      const { error } = await invokeWithAuth(SECRET_FN, { action: "set", env: secretEnv, client_secret: v });
+      const { error } = await invokeWithAuth(SECRET_FN, { action: "set", env: activeEnv, client_secret: v });
       if (error) throw error;
 
       setSecretValue("");
-      toast.success(`PayPal Client Secret (${secretEnv}) tersimpan.`);
+      toast.success(`PayPal Client Secret (${activeEnv}) tersimpan.`);
       await fetchStatus();
     } catch (e: any) {
       console.error(e);
@@ -175,19 +172,15 @@ export function usePaypalIntegration({ navigate }: { navigate: NavigateFunction 
       setActiveEnv,
       onSaveActiveEnv,
       onResetEnv,
-      clientIdEnv,
-      setClientIdEnv,
       clientIdValue,
       setClientIdValue,
       onSaveClientId,
-      secretEnv,
-      setSecretEnv,
       secretValue,
       setSecretValue,
       onSaveSecret,
       onRefresh: fetchStatus,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loading, status, enabled, activeEnv, clientIdEnv, clientIdValue, secretEnv, secretValue],
+    [loading, status, enabled, activeEnv, clientIdValue, secretValue],
   );
 }

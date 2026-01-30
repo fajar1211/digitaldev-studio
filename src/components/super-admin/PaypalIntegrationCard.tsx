@@ -31,15 +31,10 @@ type Props = {
   onSaveActiveEnv: () => void;
 
   onResetEnv: (env: PaypalEnv) => void;
-
-  clientIdEnv: PaypalEnv;
-  onClientIdEnvChange: (env: PaypalEnv) => void;
   clientIdValue: string;
   onClientIdValueChange: (v: string) => void;
   onSaveClientId: (e: FormEvent) => void;
 
-  secretEnv: PaypalEnv;
-  onSecretEnvChange: (env: PaypalEnv) => void;
   secretValue: string;
   onSecretValueChange: (v: string) => void;
   onSaveSecret: (e: FormEvent) => void;
@@ -57,13 +52,9 @@ export function PaypalIntegrationCard({
   onActiveEnvChange,
   onSaveActiveEnv,
   onResetEnv,
-  clientIdEnv,
-  onClientIdEnvChange,
   clientIdValue,
   onClientIdValueChange,
   onSaveClientId,
-  secretEnv,
-  onSecretEnvChange,
   secretValue,
   onSecretValueChange,
   onSaveSecret,
@@ -142,15 +133,9 @@ export function PaypalIntegrationCard({
           <form onSubmit={onSaveClientId} className="rounded-md border bg-muted/30 p-3 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <div className="text-xs font-medium text-foreground">Client ID</div>
-              <Select value={clientIdEnv} onValueChange={(v) => onClientIdEnvChange(v as PaypalEnv)}>
-                <SelectTrigger className="h-9 w-[160px]">
-                  <SelectValue placeholder="Env" />
-                </SelectTrigger>
-                <SelectContent className="z-50 bg-popover">
-                  <SelectItem value="sandbox">Sandbox</SelectItem>
-                  <SelectItem value="production">Production</SelectItem>
-                </SelectContent>
-              </Select>
+              <Badge variant="outline" className="h-9 px-3 inline-flex items-center">
+                {activeEnv}
+              </Badge>
             </div>
 
             <div className="space-y-1.5">
@@ -175,15 +160,9 @@ export function PaypalIntegrationCard({
           <form onSubmit={onSaveSecret} className="rounded-md border bg-muted/30 p-3 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <div className="text-xs font-medium text-foreground">Client Secret</div>
-              <Select value={secretEnv} onValueChange={(v) => onSecretEnvChange(v as PaypalEnv)}>
-                <SelectTrigger className="h-9 w-[160px]">
-                  <SelectValue placeholder="Env" />
-                </SelectTrigger>
-                <SelectContent className="z-50 bg-popover">
-                  <SelectItem value="sandbox">Sandbox</SelectItem>
-                  <SelectItem value="production">Production</SelectItem>
-                </SelectContent>
-              </Select>
+              <Badge variant="outline" className="h-9 px-3 inline-flex items-center">
+                {activeEnv}
+              </Badge>
             </div>
 
             <div className="space-y-1.5">
