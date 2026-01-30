@@ -9,6 +9,7 @@ import type { MidtransEnv, MidtransStatus } from "@/components/super-admin/Midtr
 const SETTINGS_FN = "super-admin-midtrans-settings";
 
 type GetResponse = {
+  enabled: boolean;
   configured: boolean;
   updated_at: string | null;
   active_env: MidtransEnv | null;
@@ -29,6 +30,7 @@ type GetResponse = {
 
 type SetActiveEnvResponse = { ok: boolean; active_env: MidtransEnv };
 type SetKeysResponse = { ok: boolean };
+type SetEnabledResponse = { ok: boolean; enabled: boolean };
 
 export function useMidtransIntegration({ navigate }: { navigate: NavigateFunction }) {
   const [loading, setLoading] = useState(false);
@@ -42,6 +44,8 @@ export function useMidtransIntegration({ navigate }: { navigate: NavigateFunctio
   });
 
   const [selectedEnv, setSelectedEnv] = useState<MidtransEnv>("production");
+
+  const [enabled, setEnabled] = useState(true);
 
   const [apiKeysEnv, setApiKeysEnv] = useState<MidtransEnv>("production");
   const [merchantIdValue, setMerchantIdValue] = useState("");
@@ -82,6 +86,8 @@ export function useMidtransIntegration({ navigate }: { navigate: NavigateFunctio
 
       const merchantId = String(((data as any)?.merchant_id ?? "") as any).trim();
       if (merchantId) setMerchantIdValue(merchantId);
+
+      setEnabled(Boolean((data as any)?.enabled ?? true));
     } catch (e: any) {
       console.error(e);
       if (String(e?.message ?? "").toLowerCase().includes("unauthorized")) {
@@ -113,6 +119,24 @@ export function useMidtransIntegration({ navigate }: { navigate: NavigateFunctio
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message || "Unable to save Midtrans environment.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onSaveEnabled = async () => {
+    setLoading(true);
+    try {
+      const { error } = await invokeWithAuth<SetEnabledResponse>(SETTINGS_FN, {
+        action: "set_enabled",
+        enabled,
+      });
+      if (error) throw error;
+      toast.success(`Midtrans ${enabled ? "enabled" : "disabled"}.`);
+      await fetchStatus();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || "Unable to update Midtrans enabled setting.");
     } finally {
       setLoading(false);
     }
@@ -164,6 +188,9 @@ export function useMidtransIntegration({ navigate }: { navigate: NavigateFunctio
     () => ({
       loading,
       status,
+      enabled,
+      setEnabled,
+      onSaveEnabled,
       selectedEnv,
       setSelectedEnv,
       onSaveSelectedEnv,
@@ -180,6 +207,6 @@ export function useMidtransIntegration({ navigate }: { navigate: NavigateFunctio
       onSaveApiKeys,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loading, status, selectedEnv, apiKeysEnv, merchantIdValue, clientKeyValue, serverKeyValue],
+    [loading, status, enabled, selectedEnv, apiKeysEnv, merchantIdValue, clientKeyValue, serverKeyValue],
   );
 }

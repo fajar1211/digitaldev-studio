@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.super-admin-xendit-secret]
 verify_jwt = false
+
+[functions.order-payment-provider]
+verify_jwt = false
+
+[functions.xendit-invoice-create]
+verify_jwt = false

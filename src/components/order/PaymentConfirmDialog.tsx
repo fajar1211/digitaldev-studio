@@ -18,6 +18,9 @@ type PaymentConfirmDialogProps = {
   disabled: boolean;
   confirming: boolean;
   onConfirm: () => void | Promise<void>;
+  triggerText?: string;
+  confirmText?: string;
+  note?: string;
 };
 
 export function PaymentConfirmDialog({
@@ -27,12 +30,15 @@ export function PaymentConfirmDialog({
   disabled,
   confirming,
   onConfirm,
+  triggerText = "Pay",
+  confirmText = "Confirm & Pay",
+  note,
 }: PaymentConfirmDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogTrigger asChild>
         <Button type="button" size="lg" disabled={disabled}>
-          Pay with Card
+          {triggerText}
         </Button>
       </AlertDialogTrigger>
 
@@ -41,8 +47,12 @@ export function PaymentConfirmDialog({
           <AlertDialogTitle>Confirm payment</AlertDialogTitle>
           <AlertDialogDescription>
             Amount: <span className="font-medium text-foreground">{amountUsdFormatted}</span>
-            <br />
-            During 3DS verification, Midtrans may display the amount in IDR.
+            {note ? (
+              <>
+                <br />
+                {note}
+              </>
+            ) : null}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -55,7 +65,7 @@ export function PaymentConfirmDialog({
             }}
             disabled={confirming || disabled}
           >
-            {confirming ? "Processing..." : "Confirm & Pay"}
+            {confirming ? "Processing..." : confirmText}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

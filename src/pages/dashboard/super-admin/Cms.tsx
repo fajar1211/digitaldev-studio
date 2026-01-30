@@ -467,6 +467,9 @@ export default function SuperAdminCms() {
         <MidtransIntegrationCard
           loading={midtrans.loading}
           status={midtrans.status}
+          enabled={midtrans.enabled}
+          onEnabledChange={midtrans.setEnabled}
+          onSaveEnabled={midtrans.onSaveEnabled}
           selectedEnv={midtrans.selectedEnv}
           onSelectedEnvChange={midtrans.setSelectedEnv}
           onSaveSelectedEnv={midtrans.onSaveSelectedEnv}

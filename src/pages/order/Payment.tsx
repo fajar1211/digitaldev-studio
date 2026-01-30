@@ -39,6 +39,9 @@ export default function Payment() {
   const { pricing, subscriptionPlans } = useOrderPublicSettings(state.domain);
   const midtrans = useMidtransOrderSettings();
 
+  const [gatewayLoading, setGatewayLoading] = useState(true);
+  const [gateway, setGateway] = useState<"xendit" | "midtrans" | null>(null);
+
   const [method, setMethod] = useState<"card" | "bank">("card");
   const [promo, setPromo] = useState(state.promoCode);
   const [cardNumber, setCardNumber] = useState("");
@@ -48,6 +51,29 @@ export default function Payment() {
   const [paying, setPaying] = useState(false);
   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      setGatewayLoading(true);
+      try {
+        const { data, error } = await supabase.functions.invoke<{ ok: boolean; provider: "xendit" | "midtrans" | null }>(
+          "order-payment-provider",
+          { body: {} },
+        );
+        if (error) throw error;
+        const provider = (data as any)?.provider ?? null;
+        if (provider !== "xendit" && provider !== "midtrans") {
+          navigate("/contact", { replace: true });
+          return;
+        }
+        setGateway(provider);
+      } catch {
+        navigate("/contact", { replace: true });
+      } finally {
+        setGatewayLoading(false);
+      }
+    })();
+  }, [navigate]);
 
   const baseTotalUsd = useMemo(() => {
     if (!state.subscriptionYears) return null;
@@ -120,6 +146,7 @@ export default function Payment() {
 
   // Load Midtrans 3DS script when card method is selected.
   useEffect(() => {
+    if (gateway !== "midtrans") return;
     if (method !== "card") return;
     if (!midtrans.clientKey || !midtrans.env) return;
     if (document.getElementById("midtrans-script")) return;
@@ -147,6 +174,7 @@ export default function Payment() {
   }, [cardNumber, cvv, expMonth, expYear]);
 
   const startCardPayment = async () => {
+    if (gateway !== "midtrans") return;
     if (!window.MidtransNew3ds?.getCardToken) {
       toast({ variant: "destructive", title: "Midtrans script not ready", description: "Please wait a moment and try again." });
       return;
@@ -221,6 +249,55 @@ export default function Payment() {
     }
   };
 
+  const startXenditInvoice = async () => {
+    if (totalAfterPromoUsd == null) {
+      toast({ variant: "destructive", title: "Total not available" });
+      return;
+    }
+
+    setPaying(true);
+    try {
+      const { data, error } = await supabase.functions.invoke<{
+        ok: boolean;
+        invoice_url: string | null;
+        order_db_id: string | null;
+        error?: string;
+      }>("xendit-invoice-create", {
+        body: {
+          amount_usd: totalAfterPromoUsd,
+          subscription_years: state.subscriptionYears,
+          promo_code: state.promoCode,
+          domain: state.domain,
+          selected_template_id: state.selectedTemplateId,
+          selected_template_name: state.selectedTemplateName,
+          customer_name: state.details.name,
+          customer_email: state.details.email,
+        },
+      });
+      if (error) throw error;
+      if (!(data as any)?.ok) throw new Error((data as any)?.error ?? "Failed to create invoice");
+
+      if ((data as any)?.order_db_id) setLastOrderId(String((data as any).order_db_id));
+
+      const url = String((data as any)?.invoice_url ?? "").trim();
+      if (!url) throw new Error("Invoice URL not returned");
+      window.location.href = url;
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Payment failed", description: e?.message ?? "Please try again." });
+    } finally {
+      setPaying(false);
+      setConfirmOpen(false);
+    }
+  };
+
+  if (gatewayLoading) {
+    return (
+      <OrderLayout title="Payment" step="payment" sidebar={<OrderSummaryCard />}>
+        <div className="text-sm text-muted-foreground">Loading payment options…</div>
+      </OrderLayout>
+    );
+  }
+
   return (
     <OrderLayout title="Payment" step="payment" sidebar={<OrderSummaryCard />}>
       <div className="space-y-6">
@@ -242,50 +319,52 @@ export default function Payment() {
               <div className="rounded-lg border p-4 space-y-3">
                 <div className="flex items-center justify-between gap-3 text-sm">
                   <div>
-                    <p className="font-medium text-foreground">Midtrans Card (3DS)</p>
-                    <p className="text-muted-foreground">Env: {midtrans.env}</p>
+                    <p className="font-medium text-foreground">
+                      {gateway === "xendit" ? "Xendit Invoice" : "Midtrans Card (3DS)"}
+                    </p>
+                    {gateway === "midtrans" ? <p className="text-muted-foreground">Env: {midtrans.env}</p> : null}
                   </div>
-                  {midtrans.ready ? (
-                    <span className="text-muted-foreground">Ready</span>
-                  ) : (
-                    <span className="text-muted-foreground">Not configured</span>
-                  )}
+                  <span className="text-muted-foreground">{gateway === "xendit" ? "Hosted" : midtrans.ready ? "Ready" : "Not configured"}</span>
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="md:col-span-2">
+                {gateway === "midtrans" ? (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="md:col-span-2">
+                      <Input
+                        value={cardNumber}
+                        onChange={(e) => setCardNumber(e.target.value)}
+                        placeholder="Card number"
+                        inputMode="numeric"
+                        autoComplete="cc-number"
+                      />
+                    </div>
                     <Input
-                      value={cardNumber}
-                      onChange={(e) => setCardNumber(e.target.value)}
-                      placeholder="Card number"
+                      value={expMonth}
+                      onChange={(e) => setExpMonth(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                      placeholder="MM"
                       inputMode="numeric"
-                      autoComplete="cc-number"
+                      autoComplete="cc-exp-month"
+                    />
+                    <Input
+                      value={expYear}
+                      onChange={(e) => setExpYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                      placeholder="YYYY"
+                      inputMode="numeric"
+                      autoComplete="cc-exp-year"
+                    />
+                    <Input
+                      value={cvv}
+                      onChange={(e) => setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                      placeholder="CVV"
+                      inputMode="numeric"
+                      autoComplete="cc-csc"
                     />
                   </div>
-                  <Input
-                    value={expMonth}
-                    onChange={(e) => setExpMonth(e.target.value.replace(/\D/g, "").slice(0, 2))}
-                    placeholder="MM"
-                    inputMode="numeric"
-                    autoComplete="cc-exp-month"
-                  />
-                  <Input
-                    value={expYear}
-                    onChange={(e) => setExpYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                    placeholder="YYYY"
-                    inputMode="numeric"
-                    autoComplete="cc-exp-year"
-                  />
-                  <Input
-                    value={cvv}
-                    onChange={(e) => setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                    placeholder="CVV"
-                    inputMode="numeric"
-                    autoComplete="cc-csc"
-                  />
-                </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Kamu akan diarahkan ke halaman pembayaran Xendit (Invoice) untuk menyelesaikan pembayaran.</p>
+                )}
 
-                {midtrans.error ? <p className="text-sm text-muted-foreground">{midtrans.error}</p> : null}
+                {gateway === "midtrans" && midtrans.error ? <p className="text-sm text-muted-foreground">{midtrans.error}</p> : null}
                 {lastOrderId ? (
                   <p className="text-sm text-muted-foreground">
                     Last order id: <span className="font-medium text-foreground">{lastOrderId}</span>
@@ -371,9 +450,22 @@ export default function Payment() {
               setConfirmOpen(o);
             }}
             confirming={paying}
-            disabled={!canComplete || method !== "card" || !midtrans.ready || !isCardFormValid || paying || totalAfterPromoUsd == null}
+            disabled={
+              !canComplete ||
+              method !== "card" ||
+              paying ||
+              totalAfterPromoUsd == null ||
+              (gateway === "midtrans" ? !midtrans.ready || !isCardFormValid : false)
+            }
             amountUsdFormatted={totalAfterPromoUsd == null ? "—" : usdFormatter.format(totalAfterPromoUsd)}
-            onConfirm={startCardPayment}
+            triggerText={gateway === "xendit" ? "Pay with Xendit" : "Pay with Card"}
+            confirmText={gateway === "xendit" ? "Confirm & Continue" : "Confirm & Pay"}
+            note={
+              gateway === "xendit"
+                ? "You will be redirected to Xendit Invoice checkout."
+                : "During 3DS verification, Midtrans may display the amount in IDR."
+            }
+            onConfirm={gateway === "xendit" ? startXenditInvoice : startCardPayment}
           />
         </div>
       </div>

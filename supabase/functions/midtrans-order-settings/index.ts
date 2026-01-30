@@ -13,12 +13,27 @@ const WS_MERCHANT_ID = "midtrans_merchant_id";
 const WS_CLIENT_KEY_SANDBOX = "midtrans_client_key_sandbox";
 const WS_CLIENT_KEY_PRODUCTION = "midtrans_client_key_production";
 const WS_ACTIVE_ENV = "midtrans_active_env";
+const WS_ENABLED = "midtrans_enabled";
 
-async function getWebsiteSetting(admin: any, key: string): Promise<string | null> {
+async function getWebsiteSettingValue(admin: any, key: string): Promise<unknown> {
   const { data, error } = await admin.from("website_settings").select("value").eq("key", key).maybeSingle();
   if (error) throw error;
-  const v = (data as any)?.value;
+  return (data as any)?.value;
+}
+
+async function getWebsiteSettingString(admin: any, key: string): Promise<string | null> {
+  const v = await getWebsiteSettingValue(admin, key);
   return typeof v === "string" && v.trim() ? v.trim() : null;
+}
+
+function jsonBool(v: unknown, fallback: boolean) {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (s === "true") return true;
+    if (s === "false") return false;
+  }
+  return fallback;
 }
 
 async function hasPlainServerKey(admin: any, env: Env): Promise<boolean> {
@@ -50,13 +65,16 @@ Deno.serve(async (req) => {
     // Use service role so this endpoint can be public but still read settings.
     const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
-    const merchantId = await getWebsiteSetting(admin, WS_MERCHANT_ID);
-    const sandboxClientKey = await getWebsiteSetting(admin, WS_CLIENT_KEY_SANDBOX);
-    const productionClientKey = await getWebsiteSetting(admin, WS_CLIENT_KEY_PRODUCTION);
-    const activeEnvSetting = await getWebsiteSetting(admin, WS_ACTIVE_ENV);
+    const enabledValue = await getWebsiteSettingValue(admin, WS_ENABLED);
+    const enabled = jsonBool(enabledValue, true);
 
-    const sandboxReady = Boolean(sandboxClientKey) && (await hasPlainServerKey(admin, "sandbox"));
-    const productionReady = Boolean(productionClientKey) && (await hasPlainServerKey(admin, "production"));
+    const merchantId = await getWebsiteSettingString(admin, WS_MERCHANT_ID);
+    const sandboxClientKey = await getWebsiteSettingString(admin, WS_CLIENT_KEY_SANDBOX);
+    const productionClientKey = await getWebsiteSettingString(admin, WS_CLIENT_KEY_PRODUCTION);
+    const activeEnvSetting = await getWebsiteSettingString(admin, WS_ACTIVE_ENV);
+
+    const sandboxReady = enabled && Boolean(sandboxClientKey) && (await hasPlainServerKey(admin, "sandbox"));
+    const productionReady = enabled && Boolean(productionClientKey) && (await hasPlainServerKey(admin, "production"));
 
     // Prefer admin-selected env; fallback to production if ready, otherwise sandbox.
     const env: Env =
@@ -65,15 +83,16 @@ Deno.serve(async (req) => {
         : productionReady
           ? "production"
           : "sandbox";
-    const client_key = env === "production" ? productionClientKey : sandboxClientKey;
+    const client_key = enabled ? (env === "production" ? productionClientKey : sandboxClientKey) : null;
 
     return new Response(
       JSON.stringify({
         ok: true,
+        enabled,
         env,
         merchant_id: merchantId,
         client_key,
-        ready: env === "production" ? productionReady : sandboxReady,
+        ready: enabled ? (env === "production" ? productionReady : sandboxReady) : false,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

@@ -26,6 +26,24 @@ type Payload = {
 // IMPORTANT: Keep in sync with frontend display.
 const USD_TO_IDR_RATE = 16000;
 
+const WS_MIDTRANS_ENABLED = "midtrans_enabled";
+
+async function getWebsiteSettingValue(admin: any, key: string): Promise<unknown> {
+  const { data, error } = await admin.from("website_settings").select("value").eq("key", key).maybeSingle();
+  if (error) throw error;
+  return (data as any)?.value;
+}
+
+function jsonBool(v: unknown, fallback: boolean) {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (s === "true") return true;
+    if (s === "false") return false;
+  }
+  return fallback;
+}
+
 function isEnv(v: unknown): v is Env {
   return v === "sandbox" || v === "production";
 }
@@ -124,6 +142,15 @@ Deno.serve(async (req) => {
     const customer_email = asEmail(body.customer_email);
 
     const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+
+    const enabledValue = await getWebsiteSettingValue(admin, WS_MIDTRANS_ENABLED);
+    const enabled = jsonBool(enabledValue, true);
+    if (!enabled) {
+      return new Response(JSON.stringify({ ok: false, error: "Midtrans is disabled" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const env: Env = isEnv(body.env) ? body.env : await inferEnv(admin);
     const serverKey = await getPlainServerKey(admin, env);

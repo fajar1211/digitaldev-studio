@@ -10,6 +10,7 @@ export function useMidtransOrderSettings() {
   const [clientKey, setClientKey] = useState<string | null>(null);
   const [merchantId, setMerchantId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [enabled, setEnabled] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -18,6 +19,7 @@ export function useMidtransOrderSettings() {
       try {
         const { data, error: fnErr } = await supabase.functions.invoke<{
           ok: boolean;
+          enabled?: boolean;
           env: Env;
           merchant_id: string | null;
           client_key: string | null;
@@ -28,7 +30,8 @@ export function useMidtransOrderSettings() {
         setEnv(data.env);
         setClientKey(data.client_key ?? null);
         setMerchantId(data.merchant_id ?? null);
-        setReady(Boolean(data.ready && data.client_key));
+        setEnabled(Boolean((data as any)?.enabled ?? true));
+        setReady(Boolean(Boolean((data as any)?.enabled ?? true) && data.ready && data.client_key));
       } catch (e: any) {
         setError(e?.message ?? "Failed to load Midtrans settings");
       } finally {
@@ -37,5 +40,5 @@ export function useMidtransOrderSettings() {
     })();
   }, []);
 
-  return { loading, error, env, clientKey, merchantId, ready };
+  return { loading, error, env, clientKey, merchantId, ready, enabled };
 }

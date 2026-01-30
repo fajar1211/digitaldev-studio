@@ -10,6 +10,7 @@ type Env = "sandbox" | "production";
 
 type Payload =
   | { action: "get" }
+  | { action: "set_enabled"; enabled: boolean }
   | { action: "reveal"; env: Env }
   | { action: "clear"; env: Env }
   | { action: "set"; env: Env; merchant_id: string; client_key: string; server_key: string }
@@ -19,6 +20,7 @@ const WS_MERCHANT_ID = "midtrans_merchant_id";
 const WS_CLIENT_KEY_SANDBOX = "midtrans_client_key_sandbox";
 const WS_CLIENT_KEY_PRODUCTION = "midtrans_client_key_production";
 const WS_ACTIVE_ENV = "midtrans_active_env";
+const WS_ENABLED = "midtrans_enabled";
 
 function secretNameForEnv(env: Env) {
   return env === "sandbox" ? "server_key_sandbox" : "server_key_production";
@@ -76,6 +78,16 @@ function normalizeEnv(input: unknown): Env {
   const v = String(input ?? "").trim().toLowerCase();
   if (v !== "sandbox" && v !== "production") throw new Error("Invalid env");
   return v as Env;
+}
+
+function jsonBool(v: unknown, fallback: boolean) {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (s === "true") return true;
+    if (s === "false") return false;
+  }
+  return fallback;
 }
 
 async function getSecretRow(admin: any, name: string) {
@@ -140,6 +152,7 @@ Deno.serve(async (req) => {
       const sandboxClient = await getWebsiteSetting(admin, WS_CLIENT_KEY_SANDBOX);
       const productionClient = await getWebsiteSetting(admin, WS_CLIENT_KEY_PRODUCTION);
       const activeEnv = await getWebsiteSetting(admin, WS_ACTIVE_ENV);
+      const enabledSetting = await getWebsiteSetting(admin, WS_ENABLED);
 
       const sandboxSecret = await getSecretRow(admin, secretNameForEnv("sandbox"));
       const productionSecret = await getSecretRow(admin, secretNameForEnv("production"));
@@ -153,6 +166,8 @@ Deno.serve(async (req) => {
         if (v === "sandbox" || v === "production") return v;
         return null;
       })();
+
+      const enabled = jsonBool(enabledSetting?.value, true);
 
       const sandboxServer = sandboxSecret && String((sandboxSecret as any)?.iv ?? "") === "plain" ? String((sandboxSecret as any)?.ciphertext ?? "") : "";
       const productionServer =
@@ -169,6 +184,7 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({
+          enabled,
           configured: Boolean(merchantId || sandboxClientKey || productionClientKey || sandboxServer || productionServer),
           updated_at,
           active_env,
@@ -188,6 +204,24 @@ Deno.serve(async (req) => {
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+    }
+
+    if (body.action === "set_enabled") {
+      const enabled = Boolean((body as any).enabled);
+
+      const { error: setErr } = await admin.from("website_settings").upsert({ key: WS_ENABLED, value: enabled }, { onConflict: "key" });
+      if (setErr) throw setErr;
+
+      await writeAuditLog(admin, {
+        actorUserId: String(claimsData.claims.sub),
+        action: "set_setting",
+        provider: "midtrans",
+        metadata: { key: WS_ENABLED, enabled, user_agent: req.headers.get("user-agent") },
+      });
+
+      return new Response(JSON.stringify({ ok: true, enabled }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (body.action === "set_active_env") {

@@ -5,6 +5,7 @@ import { RefreshCcw, Save, CreditCard } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 export type MidtransEnv = "sandbox" | "production";
 
@@ -16,6 +17,7 @@ export type MidtransEnvStatus = {
 };
 
 export type MidtransStatus = {
+  enabled?: boolean;
   merchantId: string | null;
   updatedAt: string | null;
   activeEnv: MidtransEnv | null;
@@ -26,6 +28,9 @@ export type MidtransStatus = {
 type Props = {
   loading: boolean;
   status: MidtransStatus;
+  enabled: boolean;
+  onEnabledChange: (enabled: boolean) => void;
+  onSaveEnabled: () => void;
   selectedEnv: MidtransEnv;
   onSelectedEnvChange: (env: MidtransEnv) => void;
   onSaveSelectedEnv: () => void;
@@ -45,6 +50,9 @@ type Props = {
 export function MidtransIntegrationCard({
   loading,
   status,
+  enabled,
+  onEnabledChange,
+  onSaveEnabled,
   selectedEnv,
   onSelectedEnvChange,
   onSaveSelectedEnv,
@@ -60,6 +68,7 @@ export function MidtransIntegrationCard({
   onSaveApiKeys,
 }: Props) {
   const configuredAny = Boolean(status.sandbox.configured || status.production.configured || status.merchantId);
+  const effectiveReady = enabled && configuredAny;
 
   return (
     <Card>
@@ -68,7 +77,10 @@ export function MidtransIntegrationCard({
           <CardTitle className="flex items-center gap-2">
             <CreditCard className="h-4 w-4" /> Payment Gateway (Midtrans)
           </CardTitle>
-          <Badge variant={configuredAny ? "default" : "secondary"}>{configuredAny ? "Ready" : "Not set"}</Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant={enabled ? "default" : "secondary"}>{enabled ? "Enabled" : "Disabled"}</Badge>
+            <Badge variant={effectiveReady ? "default" : "secondary"}>{effectiveReady ? "Ready" : "Not ready"}</Badge>
+          </div>
         </div>
       </CardHeader>
 
@@ -76,6 +88,23 @@ export function MidtransIntegrationCard({
         Pilih environment Midtrans yang aktif untuk halaman order.
 
         <div className="mt-4 space-y-4">
+          <div className="rounded-md border bg-muted/30 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-foreground">Enable Midtrans</div>
+                <div className="text-xs text-muted-foreground">
+                  Jika dimatikan, halaman <span className="font-medium text-foreground">/order</span> tidak akan menggunakan Midtrans.
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={enabled} onCheckedChange={onEnabledChange} disabled={loading} />
+                <Button type="button" size="sm" onClick={onSaveEnabled} disabled={loading}>
+                  <Save className="h-4 w-4 mr-2" /> Simpan
+                </Button>
+              </div>
+            </div>
+          </div>
+
           <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span>Merchant ID</span>
