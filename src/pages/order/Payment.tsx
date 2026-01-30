@@ -93,12 +93,44 @@ export default function Payment() {
 
   // Load PayPal JS SDK when PayPal is available.
   useEffect(() => {
-    if (!paypal.clientId) return;
-    if (document.getElementById("paypal-sdk")) return;
+    const desiredSrc = paypal.clientId
+      ? `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(paypal.clientId)}&currency=USD&intent=capture`
+      : null;
+
+    const existing = document.getElementById("paypal-sdk") as HTMLScriptElement | null;
+
+    // If no client id, ensure SDK is removed so UI doesn't get stuck with an old SDK.
+    if (!desiredSrc) {
+      if (existing) existing.remove();
+      // Best-effort: force re-init when client id comes back.
+      if (typeof window !== "undefined") {
+        try {
+          delete (window as any).paypal;
+        } catch {
+          // ignore
+        }
+      }
+      return;
+    }
+
+    if (existing) {
+      // If client-id/env changed, replace the script.
+      const currentSrc = existing.getAttribute("src") ?? "";
+      if (currentSrc !== desiredSrc) {
+        existing.remove();
+        try {
+          delete (window as any).paypal;
+        } catch {
+          // ignore
+        }
+      } else {
+        return;
+      }
+    }
 
     const s = document.createElement("script");
     s.id = "paypal-sdk";
-    s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(paypal.clientId)}&currency=USD&intent=capture`;
+    s.src = desiredSrc;
     s.async = true;
     document.body.appendChild(s);
   }, [paypal.clientId]);
