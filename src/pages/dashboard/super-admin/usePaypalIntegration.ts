@@ -11,6 +11,7 @@ const SETTINGS_FN = "super-admin-paypal-settings";
 const SECRET_FN = "super-admin-paypal-secret";
 
 type GetResponse = {
+  enabled?: boolean;
   active_env: PaypalEnv | null;
   sandbox: { ready: boolean };
   production: { ready: boolean };
@@ -18,6 +19,8 @@ type GetResponse = {
 
 export function usePaypalIntegration({ navigate }: { navigate: NavigateFunction }) {
   const [loading, setLoading] = useState(false);
+
+  const [enabled, setEnabled] = useState(true);
 
   const [status, setStatus] = useState<PaypalStatus>({ activeEnv: null, sandboxReady: false, productionReady: false });
   const [activeEnv, setActiveEnv] = useState<PaypalEnv>("sandbox");
@@ -33,6 +36,10 @@ export function usePaypalIntegration({ navigate }: { navigate: NavigateFunction 
     try {
       const { data, error } = await invokeWithAuth<GetResponse>(SETTINGS_FN, { action: "get" });
       if (error) throw error;
+
+      // Default to enabled when setting is missing (backward-compatible)
+      const en = (data as any)?.enabled;
+      if (typeof en === "boolean") setEnabled(en);
 
       const active = (data as any)?.active_env;
       if (active === "sandbox" || active === "production") setActiveEnv(active);
@@ -70,6 +77,21 @@ export function usePaypalIntegration({ navigate }: { navigate: NavigateFunction 
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message || "Unable to save PayPal environment.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onSaveEnabled = async () => {
+    setLoading(true);
+    try {
+      const { error } = await invokeWithAuth(SETTINGS_FN, { action: "set_enabled", enabled });
+      if (error) throw error;
+      toast.success(`PayPal ${enabled ? "enabled" : "disabled"}.`);
+      await fetchStatus();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || "Unable to save PayPal enabled status.");
     } finally {
       setLoading(false);
     }
@@ -144,6 +166,11 @@ export function usePaypalIntegration({ navigate }: { navigate: NavigateFunction 
     () => ({
       loading,
       status,
+
+      enabled,
+      setEnabled,
+      onSaveEnabled,
+
       activeEnv,
       setActiveEnv,
       onSaveActiveEnv,
@@ -161,6 +188,6 @@ export function usePaypalIntegration({ navigate }: { navigate: NavigateFunction 
       onRefresh: fetchStatus,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loading, status, activeEnv, clientIdEnv, clientIdValue, secretEnv, secretValue],
+    [loading, status, enabled, activeEnv, clientIdEnv, clientIdValue, secretEnv, secretValue],
   );
 }

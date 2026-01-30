@@ -18,6 +18,7 @@ const WS_MIDTRANS_ACTIVE_ENV = "midtrans_active_env";
 const WS_PAYPAL_CLIENT_ID_SANDBOX = "paypal_client_id_sandbox";
 const WS_PAYPAL_CLIENT_ID_PRODUCTION = "paypal_client_id_production";
 const WS_PAYPAL_ACTIVE_ENV = "paypal_active_env";
+const WS_PAYPAL_ENABLED = "paypal_enabled";
 
 function jsonBool(v: unknown, fallback: boolean) {
   if (typeof v === "boolean") return v;
@@ -85,19 +86,16 @@ Deno.serve(async (req) => {
 
     const paypalEnvRaw = await getWebsiteSetting(admin, WS_PAYPAL_ACTIVE_ENV);
     const paypalEnv: Env = paypalEnvRaw === "sandbox" || paypalEnvRaw === "production" ? paypalEnvRaw : "sandbox";
+
+    const paypalEnabledValue = await getWebsiteSetting(admin, WS_PAYPAL_ENABLED);
+    const paypalEnabled = jsonBool(paypalEnabledValue, true);
     const paypalClientId = await getPaypalClientId(admin, paypalEnv);
     const paypalSecretOk = await hasPaypalClientSecret(admin, paypalEnv);
-    const paypalReady = Boolean(paypalClientId && paypalSecretOk);
+    const paypalReady = paypalEnabled && Boolean(paypalClientId && paypalSecretOk);
 
     // Midtrans only if enabled AND ready.
     const enabledValue = await getWebsiteSetting(admin, WS_MIDTRANS_ENABLED);
     const midtransEnabled = jsonBool(enabledValue, true);
-    if (!midtransEnabled) {
-      return new Response(
-        JSON.stringify({ ok: true, provider: null, reason: "midtrans_disabled" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
 
     const activeEnvRaw = await getWebsiteSetting(admin, WS_MIDTRANS_ACTIVE_ENV);
     const activeEnv: Env = activeEnvRaw === "sandbox" || activeEnvRaw === "production" ? activeEnvRaw : "production";
@@ -106,7 +104,7 @@ Deno.serve(async (req) => {
     const merchantId = typeof merchantIdRaw === "string" && merchantIdRaw.trim() ? merchantIdRaw.trim() : null;
     const clientKey = await getMidtransClientKey(admin, activeEnv);
     const serverKeyOk = await hasMidtransServerKey(admin, activeEnv);
-    const midtransReady = Boolean(merchantId && clientKey && serverKeyOk);
+    const midtransReady = midtransEnabled && Boolean(merchantId && clientKey && serverKeyOk);
 
     const providers = {
       xendit: xenditReady,

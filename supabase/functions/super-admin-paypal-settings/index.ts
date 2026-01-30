@@ -10,6 +10,7 @@ type Env = "sandbox" | "production";
 
 type Payload =
   | { action: "get" }
+  | { action: "set_enabled"; enabled: boolean }
   | { action: "set_active_env"; env: Env }
   | { action: "set_client_id"; env: Env; client_id: string }
   | { action: "clear_client_id"; env: Env };
@@ -17,6 +18,18 @@ type Payload =
 const WS_PAYPAL_CLIENT_ID_SANDBOX = "paypal_client_id_sandbox";
 const WS_PAYPAL_CLIENT_ID_PRODUCTION = "paypal_client_id_production";
 const WS_PAYPAL_ACTIVE_ENV = "paypal_active_env";
+const WS_PAYPAL_ENABLED = "paypal_enabled";
+
+function normalizeEnabled(input: unknown) {
+  if (typeof input === "boolean") return input;
+  if (typeof input === "string") {
+    const s = input.trim().toLowerCase();
+    if (s === "true") return true;
+    if (s === "false") return false;
+  }
+  // Backward-compatible default
+  return true;
+}
 
 function normalizeEnv(input: unknown): Env {
   const v = String(input ?? "").trim().toLowerCase();
@@ -109,6 +122,7 @@ Deno.serve(async (req) => {
     const body = (await req.json()) as Payload;
 
     if (body.action === "get") {
+      const enabledRow = await getWebsiteSetting(admin, WS_PAYPAL_ENABLED);
       const activeEnv = await getWebsiteSetting(admin, WS_PAYPAL_ACTIVE_ENV);
       const sb = await getWebsiteSetting(admin, WS_PAYPAL_CLIENT_ID_SANDBOX);
       const pr = await getWebsiteSetting(admin, WS_PAYPAL_CLIENT_ID_PRODUCTION);
@@ -123,14 +137,26 @@ Deno.serve(async (req) => {
       const sandboxSecretOk = await hasPlainSecret(admin, "sandbox");
       const productionSecretOk = await hasPlainSecret(admin, "production");
 
+      const enabled = normalizeEnabled(enabledRow?.value);
+
       return new Response(
         JSON.stringify({
+          enabled,
           active_env,
           sandbox: { client_id_set: Boolean(sandboxClientId), secret_set: sandboxSecretOk, ready: Boolean(sandboxClientId && sandboxSecretOk) },
           production: { client_id_set: Boolean(productionClientId), secret_set: productionSecretOk, ready: Boolean(productionClientId && productionSecretOk) },
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+    }
+
+    if (body.action === "set_enabled") {
+      const enabled = Boolean((body as any).enabled);
+      const { error } = await admin.from("website_settings").upsert({ key: WS_PAYPAL_ENABLED, value: enabled }, { onConflict: "key" });
+      if (error) throw error;
+      return new Response(JSON.stringify({ ok: true, enabled }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (body.action === "set_active_env") {

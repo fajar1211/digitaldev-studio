@@ -12,6 +12,17 @@ type Env = "sandbox" | "production";
 const WS_PAYPAL_CLIENT_ID_SANDBOX = "paypal_client_id_sandbox";
 const WS_PAYPAL_CLIENT_ID_PRODUCTION = "paypal_client_id_production";
 const WS_PAYPAL_ACTIVE_ENV = "paypal_active_env";
+const WS_PAYPAL_ENABLED = "paypal_enabled";
+
+function jsonBool(v: unknown, fallback: boolean) {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (s === "true") return true;
+    if (s === "false") return false;
+  }
+  return fallback;
+}
 
 async function getWebsiteSetting(admin: any, key: string): Promise<unknown> {
   const { data, error } = await admin.from("website_settings").select("value").eq("key", key).maybeSingle();
@@ -50,12 +61,15 @@ Deno.serve(async (req) => {
     const activeEnvRaw = await getWebsiteSetting(admin, WS_PAYPAL_ACTIVE_ENV);
     const env: Env = activeEnvRaw === "sandbox" || activeEnvRaw === "production" ? activeEnvRaw : "sandbox";
 
+    const enabledRaw = await getWebsiteSetting(admin, WS_PAYPAL_ENABLED);
+    const enabled = jsonBool(enabledRaw, true);
+
     const clientIdRaw = await getWebsiteSetting(admin, env === "sandbox" ? WS_PAYPAL_CLIENT_ID_SANDBOX : WS_PAYPAL_CLIENT_ID_PRODUCTION);
     const client_id = typeof clientIdRaw === "string" && clientIdRaw.trim() ? clientIdRaw.trim() : null;
     const secret_ok = await hasPlainSecret(admin, env);
 
     return new Response(
-      JSON.stringify({ ok: true, env, client_id, ready: Boolean(client_id && secret_ok) }),
+      JSON.stringify({ ok: true, env, enabled, client_id, ready: enabled && Boolean(client_id && secret_ok) }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {

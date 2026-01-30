@@ -492,6 +492,9 @@ export default function SuperAdminCms() {
         <PaypalIntegrationCard
           loading={paypal.loading}
           status={paypal.status}
+          enabled={paypal.enabled}
+          onEnabledChange={paypal.setEnabled}
+          onSaveEnabled={paypal.onSaveEnabled}
           activeEnv={paypal.activeEnv}
           onActiveEnvChange={paypal.setActiveEnv}
           onSaveActiveEnv={paypal.onSaveActiveEnv}
