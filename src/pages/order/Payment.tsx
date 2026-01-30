@@ -65,6 +65,7 @@ export default function Payment() {
           ok: boolean;
           provider: "xendit" | "midtrans" | "paypal" | null;
           providers?: { xendit: boolean; midtrans: boolean; paypal: boolean };
+          reason?: string;
         }>(
           "order-payment-provider",
           { body: {} },
@@ -73,14 +74,17 @@ export default function Payment() {
         const provider = (data as any)?.provider ?? null;
         const providers = (data as any)?.providers ?? null;
         if (providers && typeof providers === "object") setAvailable(providers);
-        if (provider !== "xendit" && provider !== "midtrans" && provider !== "paypal") {
-          navigate("/contact", { replace: true });
-          return;
+        // Keep the payment page active even if no provider is configured yet.
+        // We'll show a message and disable payment actions until a gateway is available.
+        if (provider === "xendit" || provider === "midtrans" || provider === "paypal") {
+          setGateway(provider);
+          if (provider === "paypal") setMethod("paypal");
+        } else {
+          setGateway(null);
         }
-        setGateway(provider);
-        if (provider === "paypal") setMethod("paypal");
       } catch {
-        navigate("/contact", { replace: true });
+        // If provider detection fails, still keep the page accessible.
+        setGateway(null);
       } finally {
         setGatewayLoading(false);
       }
@@ -327,6 +331,26 @@ export default function Payment() {
   return (
     <OrderLayout title="Payment" step="payment" sidebar={<OrderSummaryCard />}>
       <div className="space-y-6">
+        {gateway == null ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Payment gateway belum aktif</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <p className="text-muted-foreground">
+                Saat ini belum ada gateway pembayaran yang terkonfigurasi (Xendit/PayPal/Midtrans). Silakan aktifkan salah satu
+                gateway di dashboard Super Admin, lalu kembali ke halaman ini.
+              </p>
+              {available ? (
+                <p className="text-muted-foreground">
+                  Status konfigurasi: Xendit {available.xendit ? "Ready" : "Off"} · PayPal {available.paypal ? "Ready" : "Off"} ·
+                  Midtrans {available.midtrans ? "Ready" : "Off"}
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
+
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Payment method</CardTitle>
@@ -340,7 +364,7 @@ export default function Payment() {
                 type="button"
                 variant={method === "paypal" ? "default" : "outline"}
                 onClick={() => setMethod("paypal")}
-                disabled={!paypalButtonsEnabled}
+                disabled={gateway == null || !paypalButtonsEnabled}
               >
                 PayPal
               </Button>
@@ -362,7 +386,7 @@ export default function Payment() {
                 {paypal.error ? <p className="text-sm text-muted-foreground">{paypal.error}</p> : null}
 
                 <PayPalButtonsSection
-                  disabled={!canComplete || paying || totalAfterPromoUsd == null || !paypalButtonsEnabled}
+                  disabled={gateway == null || !canComplete || paying || totalAfterPromoUsd == null || !paypalButtonsEnabled}
                   payload={{
                     amount_usd: totalAfterPromoUsd ?? 0,
                     subscription_years: state.subscriptionYears ?? 0,
@@ -527,6 +551,7 @@ export default function Payment() {
                 }}
                 confirming={paying}
                 disabled={
+                  gateway == null ||
                   !canComplete ||
                   paying ||
                   totalAfterPromoUsd == null ||
