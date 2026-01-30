@@ -11,7 +11,8 @@ type Env = "sandbox" | "production";
 type Payload =
   | { action: "get" }
   | { action: "set_active_env"; env: Env }
-  | { action: "set_client_id"; env: Env; client_id: string };
+  | { action: "set_client_id"; env: Env; client_id: string }
+  | { action: "clear_client_id"; env: Env };
 
 const WS_PAYPAL_CLIENT_ID_SANDBOX = "paypal_client_id_sandbox";
 const WS_PAYPAL_CLIENT_ID_PRODUCTION = "paypal_client_id_production";
@@ -145,6 +146,15 @@ Deno.serve(async (req) => {
       const env = normalizeEnv((body as any).env);
       const client_id = normalizeClientId((body as any).client_id);
       const { error } = await admin.from("website_settings").upsert({ key: wsClientIdKey(env), value: client_id }, { onConflict: "key" });
+      if (error) throw error;
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (body.action === "clear_client_id") {
+      const env = normalizeEnv((body as any).env);
+      const { error } = await admin.from("website_settings").delete().eq("key", wsClientIdKey(env));
       if (error) throw error;
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

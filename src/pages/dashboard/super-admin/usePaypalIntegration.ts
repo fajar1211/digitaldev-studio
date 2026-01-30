@@ -119,6 +119,27 @@ export function usePaypalIntegration({ navigate }: { navigate: NavigateFunction 
     }
   };
 
+  const onResetEnv = async (env: PaypalEnv) => {
+    setLoading(true);
+    try {
+      // Clear Client ID (website_settings)
+      const { error: idErr } = await invokeWithAuth(SETTINGS_FN, { action: "clear_client_id", env });
+      if (idErr) throw idErr;
+
+      // Clear Client Secret (integration_secrets)
+      const { error: secErr } = await invokeWithAuth(SECRET_FN, { action: "clear", env });
+      if (secErr) throw secErr;
+
+      toast.success(`PayPal env (${env}) di-reset.`);
+      await fetchStatus();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || "Unable to reset PayPal env.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return useMemo(
     () => ({
       loading,
@@ -126,6 +147,7 @@ export function usePaypalIntegration({ navigate }: { navigate: NavigateFunction 
       activeEnv,
       setActiveEnv,
       onSaveActiveEnv,
+      onResetEnv,
       clientIdEnv,
       setClientIdEnv,
       clientIdValue,

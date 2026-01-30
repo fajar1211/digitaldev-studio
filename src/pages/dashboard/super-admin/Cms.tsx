@@ -495,6 +495,7 @@ export default function SuperAdminCms() {
           activeEnv={paypal.activeEnv}
           onActiveEnvChange={paypal.setActiveEnv}
           onSaveActiveEnv={paypal.onSaveActiveEnv}
+          onResetEnv={paypal.onResetEnv}
           clientIdEnv={paypal.clientIdEnv}
           onClientIdEnvChange={paypal.setClientIdEnv}
           clientIdValue={paypal.clientIdValue}
