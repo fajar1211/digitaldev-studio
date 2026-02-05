@@ -210,22 +210,20 @@ export default function Blog() {
       </section>
 
       {/* Newsletter CTA */}
-      <section className="py-20 md:py-28 bg-muted/50">
+      <section className="py-20 md:py-28 bg-primary">
         <div className="container">
           <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground">
-              Get Marketing Tips in Your Inbox
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground">
+            <h2 className="text-3xl md:text-4xl font-bold text-primary-foreground">Get Marketing Tips in Your Inbox</h2>
+            <p className="mt-4 text-lg text-primary-foreground/80">
               Join our newsletter for weekly tips on growing your business online.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
               <input
                 type="email"
                 placeholder="Enter your email"
-                className="flex-1 px-4 py-3 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                className="flex-1 px-4 py-3 rounded-lg border border-primary-foreground/20 bg-background/10 text-primary-foreground placeholder:text-primary-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary-foreground"
               />
-              <Button>Subscribe</Button>
+              <Button variant="secondary">Subscribe</Button>
             </div>
           </div>
         </div>

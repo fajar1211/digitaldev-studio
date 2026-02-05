@@ -269,13 +269,13 @@ export default function Services() {
       )}
 
       {/* CTA */}
-      <section className="py-20 md:py-28 bg-muted/50">
+      <section className="py-20 md:py-28 bg-primary">
         <div className="container">
           <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground">{content.ctaTitle}</h2>
-            <p className="mt-4 text-lg text-muted-foreground">{content.ctaSubtitle}</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-primary-foreground">{content.ctaTitle}</h2>
+            <p className="mt-4 text-lg text-primary-foreground/80">{content.ctaSubtitle}</p>
             <div className="mt-10">
-              <Button size="lg" asChild>
+              <Button size="lg" variant="secondary" asChild>
                 <Link to="/packages">
                   View Packages
                   <ArrowRight className="ml-2 h-4 w-4" />
