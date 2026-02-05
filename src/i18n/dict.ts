@@ -26,7 +26,10 @@ export const dict: Dict = {
   "home.seoDesc": { id: "Cari domain dan dapatkan website profesional dalam hitungan menit.", en: "Search a domain and get a professional website in minutes." },
   "home.h1a": { id: "Pemasaran Digital Mudah untuk", en: "Easy Digital Marketing for" },
   "home.h1b": { id: "Pemilik Bisnis yang Sibuk", en: "Busy Business Owners" },
-  "home.heroSub": { id: "Cari domain dan dapatkan website profesional dalam hitungan menit.", en: "Search a domain and get a professional website in minutes." },
+  "home.heroSub": {
+    id: "Cari domain dan mulai membangun website profesional dengan mudah.",
+    en: "Search a domain and get a professional website in minutes.",
+  },
   "home.heroPill1": { id: "Tanpa kontrak", en: "No contracts" },
   "home.heroPill2": { id: "Dukungan personal", en: "Personal support" },
   "home.heroPill3": { id: "Harga terjangkau", en: "Affordable pricing" },
