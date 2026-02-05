@@ -41,14 +41,7 @@ const fallbackSubscriptionPlans: OrderSubscriptionPlan[] = [
   { years: 3, label: "3 Tahun", is_active: true, sort_order: 3 },
 ];
 
-const fallbackTemplates: OrderTemplate[] = [
-  { id: "t1", name: "Modern Business", category: "Business" },
-  { id: "t2", name: "Creative Portfolio", category: "Portfolio" },
-  { id: "t3", name: "Local Services", category: "Services" },
-  { id: "t4", name: "Studio Agency", category: "Agency" },
-  { id: "t5", name: "Clean Services", category: "Services" },
-  { id: "t6", name: "Bold Business", category: "Business" },
-];
+const fallbackTemplates: OrderTemplate[] = [];
 
 function safeString(v: unknown): string {
   return typeof v === "string" ? v : "";
@@ -98,7 +91,7 @@ function parseTemplates(value: unknown): OrderTemplate[] {
     })
     .filter(Boolean) as OrderTemplate[];
 
-  return normalized.length ? normalized : fallbackTemplates;
+  return normalized;
 }
 
 function parseContact(value: unknown): OrderContactSettings {
