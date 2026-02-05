@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PublicLayout } from "@/components/layout/PublicLayout";
 import { HomePromoBanner } from "@/components/home/HomePromoBanner";
 import { DomainSearchBar } from "@/components/order/DomainSearchBar";
+import heroHome from "@/assets/hero-home.jpg";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { useI18n } from "@/hooks/useI18n";
 import { getHomeContent } from "@/pages/home/homeContent";
@@ -23,7 +24,19 @@ export default function Home() {
   return (
     <PublicLayout>
       {/* Hero Section */}
-      <section className="relative overflow-hidden gradient-hero py-20 md:py-32 min-h-[calc(100vh-5rem)] flex items-center">
+      <section className="relative overflow-hidden py-20 md:py-32 min-h-[calc(100vh-5rem)] flex items-center">
+        <div className="absolute inset-0 -z-10">
+          <img
+            src={heroHome}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            className="h-full w-full object-cover blur-[1px] scale-105"
+          />
+          <div className="absolute inset-0 bg-navy/55" />
+          <div className="absolute inset-0 bg-[radial-gradient(45%_40%_at_50%_60%,hsl(var(--primary)/0.14),transparent)]" />
+        </div>
+
         {/* Promo banner overlays the hero (does not push content down) */}
         <div className="absolute inset-x-0 top-6 z-20">
           <HomePromoBanner />
@@ -35,12 +48,12 @@ export default function Home() {
             className="mx-auto max-w-3xl text-center"
             style={{ paddingTop: "calc(var(--homepage-promo-height, 0px) + clamp(3rem, 8vh, 5rem))" }}
           >
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-foreground animate-fade-in">
-              {t("home.h1a")} <span className="text-gradient">{t("home.h1b")}</span>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-primary-foreground animate-fade-in">
+              {t("home.h1a")} <span className="text-primary">{t("home.h1b")}</span>
             </h1>
 
             <p
-              className="mt-6 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto animate-fade-in"
+              className="mt-6 text-lg md:text-xl text-primary-foreground/80 max-w-2xl mx-auto animate-fade-in"
               style={{ animationDelay: "0.1s" }}
             >
               {t("home.heroSub")}
@@ -55,7 +68,7 @@ export default function Home() {
             </div>
 
             <div
-              className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-sm text-muted-foreground animate-fade-in"
+              className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-sm text-primary-foreground/80 animate-fade-in"
               style={{ animationDelay: "0.3s" }}
             >
               {[t("home.heroPill1"), t("home.heroPill2"), t("home.heroPill3")].map((item) => (
@@ -67,8 +80,6 @@ export default function Home() {
             </div>
           </div>
         </div>
-
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(45%_40%_at_50%_60%,hsl(var(--primary)/0.1),transparent)]" />
       </section>
 
       {/* How It Works */}
