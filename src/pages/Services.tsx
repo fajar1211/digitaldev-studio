@@ -18,6 +18,7 @@ import { PublicLayout } from "@/components/layout/PublicLayout";
 import { PageHero } from "@/components/layout/PageHero";
 import heroServices from "@/assets/hero-services.jpg";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import { useI18n } from "@/hooks/useI18n";
 
 type FaqRow = {
   id: string;
@@ -57,77 +58,150 @@ const iconMap = {
   handshake: HeartHandshake,
 } as const;
 
-const fallbackSettings: ServicesPageSettings = {
-  heroTitle: "Marketing Services That Actually Help",
-  heroSubtitle: "No fluff, no jargon. Just practical marketing support from your dedicated assist.",
-  ctaTitle: "Ready to Get Started?",
-  ctaSubtitle: "Check out our packages to find the right level of support for your business.",
-  services: [
-    {
-      icon: "globe",
-      title: "Google Business Profile (GMB) Setup",
-      description: "Get found by local customers searching for your services.",
-      features: [
-        "Complete profile setup and optimization",
-        "Photos and business information",
-        "Review response management",
-        "Regular posts and updates",
-        "Insights and performance tracking",
+function getFallbackSettings(lang: "id" | "en"): ServicesPageSettings {
+  if (lang === "id") {
+    return {
+      heroTitle: "Layanan Marketing yang Benar-Benar Membantu",
+      heroSubtitle: "Tanpa ribet, tanpa jargon. Dukungan marketing praktis dari assist khusus kamu.",
+      ctaTitle: "Siap Mulai?",
+      ctaSubtitle: "Lihat paket kami untuk menemukan dukungan yang pas untuk bisnismu.",
+      services: [
+        {
+          icon: "globe",
+          title: "Setup Google Business Profile (GBP)",
+          description: "Biar bisnismu mudah ditemukan pelanggan lokal.",
+          features: [
+            "Setup & optimasi profil lengkap",
+            "Foto dan informasi bisnis",
+            "Manajemen respons ulasan",
+            "Posting & update rutin",
+            "Insight dan pelacakan performa",
+          ],
+        },
+        {
+          icon: "message",
+          title: "Posting Media Sosial",
+          description: "Bangun brand dengan konten sosial yang konsisten dan engaging.",
+          features: [
+            "Perencanaan kalender konten",
+            "Desain visual dan grafis",
+            "Optimasi sesuai platform",
+            "Strategi hashtag",
+            "Engagement & community",
+          ],
+        },
+        {
+          icon: "code",
+          title: "Pembuatan Website",
+          description: "Website modern yang cepat dan membantu konversi.",
+          features: [
+            "Desain modern & responsif",
+            "Mobile-first",
+            "Struktur ramah SEO",
+            "Loading cepat",
+            "Mudah dikelola",
+          ],
+        },
+        {
+          icon: "file",
+          title: "Blog & Konten SEO",
+          description: "Tarik traffic organik lewat konten berkualitas yang bisa ranking.",
+          features: [
+            "Riset keyword & strategi",
+            "Artikel blog SEO",
+            "Konten yang membangun authority",
+            "Jadwal publikasi rutin",
+            "Analitik performa",
+          ],
+        },
+        {
+          icon: "handshake",
+          title: "Bantuan Marketing Berkelanjutan",
+          description: "Assist khusus kamu untuk berbagai kebutuhan marketing.",
+          features: [
+            "Sesi strategi rutin",
+            "Manajemen & eksekusi tugas",
+            "Laporan performa",
+            "Respons cepat",
+            "Prioritas fleksibel",
+          ],
+        },
       ],
-    },
-    {
-      icon: "message",
-      title: "Social Media Posting",
-      description: "Build your brand with consistent, engaging social content.",
-      features: [
-        "Content calendar planning",
-        "Custom graphics and visuals",
-        "Platform-specific optimization",
-        "Hashtag strategy",
-        "Engagement and community building",
-      ],
-    },
-    {
-      icon: "code",
-      title: "Website Development",
-      description: "Beautiful, fast websites that convert visitors into customers.",
-      features: [
-        "Modern, responsive design",
-        "Mobile-first approach",
-        "SEO-friendly structure",
-        "Fast loading speeds",
-        "Easy content management",
-      ],
-    },
-    {
-      icon: "file",
-      title: "Blog & SEO Content",
-      description: "Attract organic traffic with quality content that ranks.",
-      features: [
-        "Keyword research and strategy",
-        "SEO-optimized blog posts",
-        "Content that builds authority",
-        "Regular publishing schedule",
-        "Performance analytics",
-      ],
-    },
-    {
-      icon: "handshake",
-      title: "Ongoing Marketing Assistance",
-      description: "Your dedicated assist for all marketing needs.",
-      features: [
-        "Weekly strategy calls",
-        "Task management and execution",
-        "Performance reporting",
-        "Quick response times",
-        "Flexible task prioritization",
-      ],
-    },
-  ],
-};
+    };
+  }
 
-function sanitizeServices(value: unknown): ServicesPageSettings {
-  if (!value || typeof value !== "object") return fallbackSettings;
+  return {
+    heroTitle: "Marketing Services That Actually Help",
+    heroSubtitle: "No fluff, no jargon. Just practical marketing support from your dedicated assist.",
+    ctaTitle: "Ready to Get Started?",
+    ctaSubtitle: "Check out our packages to find the right level of support for your business.",
+    services: [
+      {
+        icon: "globe",
+        title: "Google Business Profile (GMB) Setup",
+        description: "Get found by local customers searching for your services.",
+        features: [
+          "Complete profile setup and optimization",
+          "Photos and business information",
+          "Review response management",
+          "Regular posts and updates",
+          "Insights and performance tracking",
+        ],
+      },
+      {
+        icon: "message",
+        title: "Social Media Posting",
+        description: "Build your brand with consistent, engaging social content.",
+        features: [
+          "Content calendar planning",
+          "Custom graphics and visuals",
+          "Platform-specific optimization",
+          "Hashtag strategy",
+          "Engagement and community building",
+        ],
+      },
+      {
+        icon: "code",
+        title: "Website Development",
+        description: "Beautiful, fast websites that convert visitors into customers.",
+        features: [
+          "Modern, responsive design",
+          "Mobile-first approach",
+          "SEO-friendly structure",
+          "Fast loading speeds",
+          "Easy content management",
+        ],
+      },
+      {
+        icon: "file",
+        title: "Blog & SEO Content",
+        description: "Attract organic traffic with quality content that ranks.",
+        features: [
+          "Keyword research and strategy",
+          "SEO-optimized blog posts",
+          "Content that builds authority",
+          "Regular publishing schedule",
+          "Performance analytics",
+        ],
+      },
+      {
+        icon: "handshake",
+        title: "Ongoing Marketing Assistance",
+        description: "Your dedicated assist for all marketing needs.",
+        features: [
+          "Weekly strategy calls",
+          "Task management and execution",
+          "Performance reporting",
+          "Quick response times",
+          "Flexible task prioritization",
+        ],
+      },
+    ],
+  };
+}
+
+function sanitizeServices(value: unknown, fallback: ServicesPageSettings): ServicesPageSettings {
+  if (!value || typeof value !== "object") return fallback;
   const v = value as any;
 
   const services: ServiceItem[] = Array.isArray(v.services)
@@ -151,22 +225,44 @@ function sanitizeServices(value: unknown): ServicesPageSettings {
     : [];
 
   return {
-    heroTitle: typeof v.heroTitle === "string" ? v.heroTitle : fallbackSettings.heroTitle,
-    heroSubtitle: typeof v.heroSubtitle === "string" ? v.heroSubtitle : fallbackSettings.heroSubtitle,
-    ctaTitle: typeof v.ctaTitle === "string" ? v.ctaTitle : fallbackSettings.ctaTitle,
-    ctaSubtitle: typeof v.ctaSubtitle === "string" ? v.ctaSubtitle : fallbackSettings.ctaSubtitle,
-    services: services.length ? services : fallbackSettings.services,
+    heroTitle: typeof v.heroTitle === "string" ? v.heroTitle : fallback.heroTitle,
+    heroSubtitle: typeof v.heroSubtitle === "string" ? v.heroSubtitle : fallback.heroSubtitle,
+    ctaTitle: typeof v.ctaTitle === "string" ? v.ctaTitle : fallback.ctaTitle,
+    ctaSubtitle: typeof v.ctaSubtitle === "string" ? v.ctaSubtitle : fallback.ctaSubtitle,
+    services: services.length ? services : fallback.services,
   };
 }
 
+function renderTitleLastWordPrimary(title: string) {
+  const trimmed = (title ?? "").trim();
+  if (!trimmed) return null;
+  const parts = trimmed.split(/\s+/);
+  if (parts.length === 1) return <span className="text-primary">{trimmed}</span>;
+  const last = parts.pop();
+  return (
+    <>
+      {parts.join(" ")}{" "}
+      <span className="text-primary">{last}</span>
+    </>
+  );
+}
+
 export default function Services() {
+  const { lang, t } = useI18n();
+
   usePageSeo("services", {
-    title: "Services | EasyMarketingAssist",
-    description: "Marketing services that actually help — SEO, social media, GMB, and more.",
+    title: t("services.seoTitle"),
+    description: t("services.seoDesc"),
   });
 
-  const [content, setContent] = useState<ServicesPageSettings>(fallbackSettings);
+  const fallback = useMemo(() => getFallbackSettings(lang), [lang]);
+
+  const [content, setContent] = useState<ServicesPageSettings>(fallback);
   const [faqs, setFaqs] = useState<FaqRow[]>([]);
+
+  useEffect(() => {
+    setContent(fallback);
+  }, [fallback]);
 
   useEffect(() => {
     (async () => {
@@ -176,9 +272,9 @@ export default function Services() {
         .eq("key", SETTINGS_KEY)
         .maybeSingle();
 
-      if (!error) setContent(sanitizeServices(data?.value));
+      if (!error) setContent(sanitizeServices(data?.value, fallback));
     })();
-  }, []);
+  }, [fallback]);
 
   useEffect(() => {
     (async () => {
@@ -208,7 +304,7 @@ export default function Services() {
       {/* Hero */}
       <PageHero
         backgroundImage={heroServices}
-        title={content.heroTitle}
+        title={renderTitleLastWordPrimary(content.heroTitle) ?? content.heroTitle}
         subtitle={content.heroSubtitle}
       />
 
@@ -252,7 +348,7 @@ export default function Services() {
         <section className="py-20 md:py-28 bg-muted/50">
           <div className="container">
             <div className="mx-auto max-w-2xl text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold text-foreground">Common Questions</h2>
+              <h2 className="text-3xl md:text-4xl font-bold text-foreground">{t("services.faqTitle")}</h2>
             </div>
             <div className="mx-auto max-w-3xl space-y-6">
               {faqs.map((faq) => (
@@ -277,7 +373,7 @@ export default function Services() {
             <div className="mt-10">
               <Button size="lg" variant="secondary" asChild>
                 <Link to="/packages">
-                  View Packages
+                  {t("services.ctaButton")}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>

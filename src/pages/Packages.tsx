@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Check, Star } from "lucide-react";
 
@@ -11,6 +11,7 @@ import { PublicLayout } from "@/components/layout/PublicLayout";
 import { PageHero } from "@/components/layout/PageHero";
 import heroPackages from "@/assets/hero-packages.jpg";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import { useI18n } from "@/hooks/useI18n";
 
 type FaqRow = {
   id: string;
@@ -61,9 +62,11 @@ function sortPackagesForPublic(p1: PublicPackageRow, p2: PublicPackageRow) {
 }
 
 export default function Packages() {
+  const { t } = useI18n();
+
   usePageSeo("packages", {
-    title: "Packages & Pricing | EasyMarketingAssist",
-    description: "Simple, transparent pricing for marketing assistance packages.",
+    title: t("packages.seoTitle"),
+    description: t("packages.seoDesc"),
   });
 
   const [faqs, setFaqs] = useState<FaqRow[]>([]);
@@ -96,6 +99,16 @@ export default function Packages() {
     })();
   }, []);
 
+  const fallbackFaqs = useMemo(
+    () => [
+      { id: "fallback-1", q: t("packages.faq1q"), a: t("packages.faq1a") },
+      { id: "fallback-2", q: t("packages.faq2q"), a: t("packages.faq2a") },
+      { id: "fallback-3", q: t("packages.faq3q"), a: t("packages.faq3a") },
+      { id: "fallback-4", q: t("packages.faq4q"), a: t("packages.faq4a") },
+    ],
+    [t]
+  );
+
   return (
     <PublicLayout>
       {/* Hero */}
@@ -103,19 +116,19 @@ export default function Packages() {
         backgroundImage={heroPackages}
         title={
           <>
-            Simple, Transparent <span className="text-primary">Pricing</span>
+            {t("packages.heroTitleA")} <span className="text-primary">{t("packages.heroTitleB")}</span>
           </>
         }
-        subtitle={"Choose the package that fits your needs. No hidden fees, no long-term contracts."}
+        subtitle={t("packages.heroSub")}
       />
 
       {/* Packages */}
       <section className="py-20 md:py-28">
         <div className="container">
           {loading ? (
-            <p className="text-center text-muted-foreground">Loading packages...</p>
+            <p className="text-center text-muted-foreground">{t("packages.loading")}</p>
           ) : packages.length === 0 ? (
-            <p className="text-center text-muted-foreground">No packages available.</p>
+            <p className="text-center text-muted-foreground">{t("packages.empty")}</p>
           ) : (
             <div className="mx-auto max-w-6xl">
               <div className="flex flex-wrap justify-center gap-8">
@@ -127,37 +140,40 @@ export default function Packages() {
                       className="relative flex w-full max-w-sm flex-col shadow-soft animate-fade-in sm:basis-[calc(50%-1rem)] lg:basis-[calc(33.333%-1.34rem)]"
                       style={{ animationDelay: `${i * 0.1}s` }}
                     >
-                    {!!pkg.is_recommended && (
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                        <Badge variant="default" className="gap-1">
-                          <Star className="h-3.5 w-3.5" />
-                          Recommended
-                        </Badge>
-                      </div>
-                    )}
-                    <CardHeader className="text-center pb-4">
-                      <CardDescription className="text-primary font-medium uppercase text-xs">{pkg.type}</CardDescription>
-                      <CardTitle className="text-xl">{pkg.name}</CardTitle>
-                      <div className="mt-4">
-                        <span className="text-4xl font-bold text-foreground">${Number(pkg.price ?? 0).toFixed(0)}</span>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="flex-1">
-                      {pkg.description && <p className="text-sm text-muted-foreground text-center mb-6">{pkg.description}</p>}
-                      <ul className="space-y-3">
-                        {features.map((f: any, j: number) => (
-                          <li key={j} className="flex items-start gap-3 text-sm">
-                            <Check className="h-4 w-4 text-accent mt-0.5 flex-shrink-0" />
-                            <span className="text-foreground">{String(f)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                    <CardFooter className="pt-6">
-                      <Button className="w-full" variant="default" asChild>
-                        <Link to="/auth">Get Started<ArrowRight className="ml-2 h-4 w-4" /></Link>
-                      </Button>
-                    </CardFooter>
+                      {!!pkg.is_recommended && (
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                          <Badge variant="default" className="gap-1">
+                            <Star className="h-3.5 w-3.5" />
+                            {t("packages.recommended")}
+                          </Badge>
+                        </div>
+                      )}
+                      <CardHeader className="text-center pb-4">
+                        <CardDescription className="text-primary font-medium uppercase text-xs">{pkg.type}</CardDescription>
+                        <CardTitle className="text-xl">{pkg.name}</CardTitle>
+                        <div className="mt-4">
+                          <span className="text-4xl font-bold text-foreground">${Number(pkg.price ?? 0).toFixed(0)}</span>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="flex-1">
+                        {pkg.description && <p className="text-sm text-muted-foreground text-center mb-6">{pkg.description}</p>}
+                        <ul className="space-y-3">
+                          {features.map((f: any, j: number) => (
+                            <li key={j} className="flex items-start gap-3 text-sm">
+                              <Check className="h-4 w-4 text-accent mt-0.5 flex-shrink-0" />
+                              <span className="text-foreground">{String(f)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                      <CardFooter className="pt-6">
+                        <Button className="w-full" variant="default" asChild>
+                          <Link to="/auth">
+                            {t("packages.getStarted")}
+                            <ArrowRight className="ml-2 h-4 w-4" />
+                          </Link>
+                        </Button>
+                      </CardFooter>
                     </Card>
                   );
                 })}
@@ -171,35 +187,12 @@ export default function Packages() {
       <section className="py-20 md:py-28 bg-muted/50">
         <div className="container">
           <div className="mx-auto max-w-2xl text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground">
-              Common Questions
-            </h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground">{t("packages.faqTitle")}</h2>
           </div>
           <div className="mx-auto max-w-3xl space-y-6">
             {(faqs.length
               ? faqs.map((f) => ({ q: f.question, a: f.answer, id: f.id }))
-              : [
-                  {
-                    id: "fallback-1",
-                    q: "Can I change packages later?",
-                    a: "Absolutely! You can upgrade or downgrade your package at any time. Changes take effect on your next billing cycle.",
-                  },
-                  {
-                    id: "fallback-2",
-                    q: "Is there a long-term contract?",
-                    a: "No contracts! All our monthly packages are month-to-month. Cancel anytime with no penalties.",
-                  },
-                  {
-                    id: "fallback-3",
-                    q: "How do I communicate with my assist?",
-                    a: "Depending on your package, you can communicate via email, our dashboard, or direct messaging apps like Slack or WhatsApp.",
-                  },
-                  {
-                    id: "fallback-4",
-                    q: "What if I need something custom?",
-                    a: "We love custom requests! Contact us and we'll create a package that fits your unique needs.",
-                  },
-                ]
+              : fallbackFaqs
             ).map((faq) => (
               <Card key={faq.id} className="shadow-soft">
                 <CardContent className="pt-6">
@@ -216,16 +209,12 @@ export default function Packages() {
       <section className="py-20 md:py-28 bg-primary">
         <div className="container">
           <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl md:text-4xl font-bold text-primary-foreground">
-              Ready to Get Your Marketing Assist?
-            </h2>
-            <p className="mt-4 text-lg text-primary-foreground/80">
-              Login or create an account to get started today.
-            </p>
+            <h2 className="text-3xl md:text-4xl font-bold text-primary-foreground">{t("packages.ctaTitle")}</h2>
+            <p className="mt-4 text-lg text-primary-foreground/80">{t("packages.ctaSub")}</p>
             <div className="mt-10">
               <Button size="lg" variant="secondary" asChild>
                 <Link to="/auth">
-                  Login to Get Started
+                  {t("packages.ctaButton")}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>

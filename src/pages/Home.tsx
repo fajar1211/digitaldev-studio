@@ -116,7 +116,7 @@ export default function Home() {
             animationDelay: `${index * 0.1}s`
           }}>
                 <CardContent className="pt-8 pb-8 text-center">
-                  <div className="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-accent/10 text-accent mb-6">
+                  <div className="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-primary mb-6">
                     <item.icon className="h-7 w-7" />
                   </div>
                   <h3 className="text-xl font-semibold text-foreground mb-3">{item.title}</h3>

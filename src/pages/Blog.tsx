@@ -11,6 +11,7 @@ import { PageHero } from "@/components/layout/PageHero";
 import heroBlog from "@/assets/hero-blog.jpg";
 import { supabase } from "@/integrations/supabase/client";
 import { usePageSeo } from "@/hooks/usePageSeo";
+import { useI18n } from "@/hooks/useI18n";
 
 type BlogListItem = {
   id: string;
@@ -28,9 +29,11 @@ type BlogListItem = {
 };
 
 export default function Blog() {
+  const { t } = useI18n();
+
   usePageSeo("blog", {
-    title: "Blog | EasyMarketingAssist",
-    description: "Marketing tips and insights to help you grow your business online.",
+    title: t("blog.seoTitle"),
+    description: t("blog.seoDesc"),
   });
 
   const [posts, setPosts] = useState<BlogListItem[]>([]);
@@ -55,7 +58,6 @@ export default function Blog() {
       if (cancelled) return;
 
       if (error) {
-        // Jika ada error (mis. RLS / jaringan), kita tetap render halaman tanpa crash.
         console.error("Failed to load blog posts", error);
         setPosts([]);
       } else {
@@ -105,10 +107,10 @@ export default function Blog() {
         backgroundImage={heroBlog}
         title={
           <>
-            Marketing Tips & <span className="text-primary">Insights</span>
+            {t("blog.heroTitleA")} <span className="text-primary">{t("blog.heroTitleB")}</span>
           </>
         }
-        subtitle={"Practical advice to help you grow your business online. No jargon, just helpful tips."}
+        subtitle={t("blog.heroSub")}
       />
 
       {/* Blog Posts */}
@@ -117,10 +119,7 @@ export default function Blog() {
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             {loading ? (
               Array.from({ length: 6 }).map((_, index) => (
-                <Card
-                  key={`skeleton-${index}`}
-                  className="overflow-hidden shadow-soft animate-pulse"
-                >
+                <Card key={`skeleton-${index}`} className="overflow-hidden shadow-soft animate-pulse">
                   <div className="aspect-video bg-muted" />
                   <CardHeader className="pb-2">
                     <div className="h-5 w-24 rounded bg-muted" />
@@ -139,9 +138,7 @@ export default function Blog() {
               cards.map((post, index) => {
                 const publishedDate = post.publish_at ?? post.created_at;
                 const dateLabel = format(new Date(publishedDate), "MMM d, yyyy");
-                const readTimeLabel = post.reading_time_minutes
-                  ? `${post.reading_time_minutes} min read`
-                  : "";
+                const readTimeLabel = post.reading_time_minutes ? `${post.reading_time_minutes} min read` : "";
 
                 return (
                   <Card
@@ -159,23 +156,23 @@ export default function Blog() {
                     </div>
                     <CardHeader className="pb-2">
                       <div className="flex flex-wrap gap-2">
-                        {(post.categories.length ? post.categories : ["Uncategorized"]).slice(0, 2).map((c) => (
+                        {(post.categories.length ? post.categories : [t("blog.uncategorized")]).slice(0, 2).map((c) => (
                           <Badge key={c} variant="secondary" className="w-fit text-xs">
                             {c}
                           </Badge>
                         ))}
                       </div>
-                      <h3 className="text-xl font-semibold text-foreground mt-2 line-clamp-2">
-                        {post.title}
-                      </h3>
-                      <p className="mt-1 text-xs text-muted-foreground">By {post.author}</p>
+                      <h3 className="text-xl font-semibold text-foreground mt-2 line-clamp-2">{post.title}</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {t("blog.by")} {post.author}
+                      </p>
                     </CardHeader>
                     <CardContent className="pb-4">
                       {post.tags.length ? (
                         <div className="mt-1 flex flex-wrap gap-2">
-                          {post.tags.slice(0, 6).map((t) => (
-                            <Badge key={t} variant="outline" className="text-xs">
-                              {t}
+                          {post.tags.slice(0, 6).map((tt) => (
+                            <Badge key={tt} variant="outline" className="text-xs">
+                              {tt}
                             </Badge>
                           ))}
                         </div>
@@ -195,8 +192,8 @@ export default function Blog() {
                         ) : null}
                       </div>
                       <Button asChild variant="ghost" size="sm" className="text-primary hover:text-primary/80 p-0">
-                        <Link to={`/blog/${post.slug}`} aria-label={`Read full article: ${post.title}`}>
-                          Read More
+                        <Link to={`/blog/${post.slug}`} aria-label={`${t("blog.readMore")}: ${post.title}`}>
+                          {t("blog.readMore")}
                           <ArrowRight className="ml-1 h-3 w-3" />
                         </Link>
                       </Button>
@@ -213,17 +210,15 @@ export default function Blog() {
       <section className="py-20 md:py-28 bg-primary">
         <div className="container">
           <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl md:text-4xl font-bold text-primary-foreground">Get Marketing Tips in Your Inbox</h2>
-            <p className="mt-4 text-lg text-primary-foreground/80">
-              Join our newsletter for weekly tips on growing your business online.
-            </p>
+            <h2 className="text-3xl md:text-4xl font-bold text-primary-foreground">{t("blog.newsletterTitle")}</h2>
+            <p className="mt-4 text-lg text-primary-foreground/80">{t("blog.newsletterSub")}</p>
             <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
               <input
                 type="email"
-                placeholder="Enter your email"
+                placeholder={t("blog.emailPlaceholder")}
                 className="flex-1 px-4 py-3 rounded-lg border border-primary-foreground/20 bg-background/10 text-primary-foreground placeholder:text-primary-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary-foreground"
               />
-              <Button variant="secondary">Subscribe</Button>
+              <Button variant="secondary">{t("blog.subscribe")}</Button>
             </div>
           </div>
         </div>

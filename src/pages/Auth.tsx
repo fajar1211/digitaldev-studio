@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, ArrowLeft, UserCircle, Briefcase } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { useState, useEffect, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Eye, EyeOff, ArrowLeft, UserCircle, Briefcase } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Dialog,
   DialogContent,
@@ -14,60 +14,75 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { z } from 'zod';
-import { useWebsiteLayoutSettings } from '@/hooks/useWebsiteLayout';
- 
-type AppRole = 'user' | 'assist';
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { z } from "zod";
+import { useWebsiteLayoutSettings } from "@/hooks/useWebsiteLayout";
+import { useI18n } from "@/hooks/useI18n";
 
-const loginSchema = z.object({
-  email: z.string().trim().email('Please enter a valid email'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-});
-
-const signupUserSchema = loginSchema
-  .extend({
-    firstName: z.string().trim().min(1, 'First name is required').max(50, 'First name must be less than 50 characters'),
-    lastName: z.string().trim().min(1, 'Last name is required').max(50, 'Last name must be less than 50 characters'),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: 'Passwords do not match',
-    path: ['confirmPassword'],
-  });
-
-const signupAssistSchema = loginSchema
-  .extend({
-    // Use firstName field to store Full Name for assist
-    firstName: z.string().trim().min(1, 'Full name is required').max(100, 'Full name must be less than 100 characters'),
-    lastName: z.string().optional(),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: 'Passwords do not match',
-    path: ['confirmPassword'],
-  });
+type AppRole = "user" | "assist";
 
 export default function Auth() {
+  const { t } = useI18n();
+
+  const loginSchema = useMemo(
+    () =>
+      z.object({
+        email: z.string().trim().email(t("auth.val.email")),
+        password: z.string().min(6, t("auth.val.passMin")),
+      }),
+    [t]
+  );
+
+  const signupUserSchema = useMemo(
+    () =>
+      loginSchema
+        .extend({
+          firstName: z.string().trim().min(1, t("auth.val.firstReq")).max(50, t("auth.val.firstReq")),
+          lastName: z.string().trim().min(1, t("auth.val.lastReq")).max(50, t("auth.val.lastReq")),
+          confirmPassword: z.string(),
+        })
+        .refine((data) => data.password === data.confirmPassword, {
+          message: t("auth.val.passMatch"),
+          path: ["confirmPassword"],
+        }),
+    [loginSchema, t]
+  );
+
+  const signupAssistSchema = useMemo(
+    () =>
+      loginSchema
+        .extend({
+          // Use firstName field to store Full Name for assist
+          firstName: z.string().trim().min(1, t("auth.val.fullReq")).max(100, t("auth.val.fullReq")),
+          lastName: z.string().optional(),
+          confirmPassword: z.string(),
+        })
+        .refine((data) => data.password === data.confirmPassword, {
+          message: t("auth.val.passMatch"),
+          path: ["confirmPassword"],
+        }),
+    [loginSchema, t]
+  );
+
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<AppRole>('user');
+  const [selectedRole, setSelectedRole] = useState<AppRole>("user");
   const [forgotOpen, setForgotOpen] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotEmail, setForgotEmail] = useState("");
   const [forgotSubmitting, setForgotSubmitting] = useState(false);
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user, role, signIn, signUp, loading } = useAuth();
@@ -75,26 +90,26 @@ export default function Auth() {
   // Redirect if already logged in
   useEffect(() => {
     if (!loading && user && role) {
-      if (role === 'assist') {
+      if (role === "assist") {
         (async () => {
           try {
             const { data, error } = await (supabase as any)
-              .from('profiles')
-              .select('onboarding_completed')
-              .eq('id', user.id)
+              .from("profiles")
+              .select("onboarding_completed")
+              .eq("id", user.id)
               .maybeSingle();
 
             if (error) throw error;
 
             const completed = (data as any)?.onboarding_completed ?? false;
-            navigate(completed ? '/dashboard/assist' : '/orientation/welcome');
+            navigate(completed ? "/dashboard/assist" : "/orientation/welcome");
           } catch (err) {
-            console.error('Error checking onboarding status:', err);
-            navigate('/dashboard/assist');
+            console.error("Error checking onboarding status:", err);
+            navigate("/dashboard/assist");
           }
         })();
       } else {
-        navigate('/dashboard/user');
+        navigate("/dashboard/user");
       }
     }
   }, [user, role, loading, navigate]);
@@ -102,10 +117,10 @@ export default function Auth() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
-    
-    const schema = isLogin ? loginSchema : selectedRole === 'assist' ? signupAssistSchema : signupUserSchema;
+
+    const schema = isLogin ? loginSchema : selectedRole === "assist" ? signupAssistSchema : signupUserSchema;
     const result = schema.safeParse(formData);
-    
+
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
       result.error.errors.forEach((error) => {
@@ -123,16 +138,16 @@ export default function Auth() {
       const { error } = await signIn(formData.email, formData.password, selectedRole);
       if (error) {
         toast({
-          variant: 'destructive',
-          title: 'Login failed',
+          variant: "destructive",
+          title: "Login failed",
           description: error.message,
         });
         setIsSubmitting(false);
         return;
       }
       toast({
-        title: 'Welcome back!',
-        description: 'Redirecting to your dashboard...',
+        title: "Welcome back!",
+        description: "Redirecting to your dashboard...",
       });
       // Navigation handled by useEffect
     } else {
@@ -141,7 +156,7 @@ export default function Auth() {
         formData.email,
         formData.password,
         fullName,
-        selectedRole === 'assist' ? '' : formData.lastName,
+        selectedRole === "assist" ? "" : formData.lastName,
         selectedRole
       );
       if (error) {
@@ -150,20 +165,23 @@ export default function Auth() {
         const status = Number(anyErr?.status ?? 0);
 
         let message = error.message;
-        if (message.includes('already registered')) {
-          message = 'An account with this email already exists. Please login instead.';
+        if (message.includes("already registered")) {
+          message = "An account with this email already exists. Please login instead.";
         }
 
-        // Supabase Auth sends emails on signup; repeated tests can hit rate limits (HTTP 429)
-        if (status === 429 || code === 'over_email_send_rate_limit' || message.toLowerCase().includes('email rate limit exceeded')) {
+        if (
+          status === 429 ||
+          code === "over_email_send_rate_limit" ||
+          message.toLowerCase().includes("email rate limit exceeded")
+        ) {
           message =
-            'Too many sign-up attempts in a short time (email rate limit). ' +
-            'Please wait a few minutes and try again.';
+            "Too many sign-up attempts in a short time (email rate limit). " +
+            "Please wait a few minutes and try again.";
         }
 
         toast({
-          variant: 'destructive',
-          title: 'Sign up failed',
+          variant: "destructive",
+          title: "Sign up failed",
           description: message,
         });
         setIsSubmitting(false);
@@ -171,33 +189,33 @@ export default function Auth() {
       }
 
       const first = formData.firstName.trim();
-      const last = selectedRole === 'assist' ? '' : formData.lastName.trim();
+      const last = selectedRole === "assist" ? "" : formData.lastName.trim();
 
-      if (selectedRole === 'assist') {
-        sessionStorage.setItem('orientation_fullName', first);
-        sessionStorage.setItem('orientation_firstName', first);
-        sessionStorage.setItem('orientation_lastName', last);
+      if (selectedRole === "assist") {
+        sessionStorage.setItem("orientation_fullName", first);
+        sessionStorage.setItem("orientation_firstName", first);
+        sessionStorage.setItem("orientation_lastName", last);
       }
 
-      if (selectedRole === 'user') {
-        sessionStorage.setItem('onboarding_firstName', first);
-        sessionStorage.setItem('onboarding_lastName', last);
+      if (selectedRole === "user") {
+        sessionStorage.setItem("onboarding_firstName", first);
+        sessionStorage.setItem("onboarding_lastName", last);
       }
 
       toast({
-        title: 'Account created!',
-        description: 'Please check your email to verify your account.',
+        title: "Account created!",
+        description: "Please check your email to verify your account.",
       });
       setIsLogin(true);
     }
-    
+
     setIsSubmitting(false);
   };
 
   const handleForgotPassword = async () => {
     const email = forgotEmail.trim();
     if (!email) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please enter your email.' });
+      toast({ variant: "destructive", title: "Error", description: "Please enter your email." });
       return;
     }
 
@@ -208,22 +226,24 @@ export default function Auth() {
       if (error) throw error;
 
       toast({
-        title: 'Email sent',
-        description: 'Please check your inbox for the password reset link.',
+        title: "Email sent",
+        description: "Please check your inbox for the password reset link.",
       });
       setForgotOpen(false);
-      setForgotEmail('');
+      setForgotEmail("");
     } catch (e: any) {
-      const msg = String(e?.message ?? 'Failed to send reset email.');
-      const code = String(e?.code ?? '').trim();
+      const msg = String(e?.message ?? "Failed to send reset email.");
+      const code = String(e?.code ?? "").trim();
       const status = Number(e?.status ?? 0);
 
       const description =
-        status === 429 || code === 'over_email_send_rate_limit' || msg.toLowerCase().includes('email rate limit exceeded')
-          ? 'Too many email requests in a short time. Please wait a few minutes and try again.'
+        status === 429 ||
+        code === "over_email_send_rate_limit" ||
+        msg.toLowerCase().includes("email rate limit exceeded")
+          ? "Too many email requests in a short time. Please wait a few minutes and try again."
           : msg;
 
-      toast({ variant: 'destructive', title: 'Failed', description });
+      toast({ variant: "destructive", title: "Failed", description });
     } finally {
       setForgotSubmitting(false);
     }
@@ -247,7 +267,7 @@ export default function Auth() {
         className="absolute top-6 left-6 flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to Home
+        {t("auth.backHome")}
       </Link>
 
       <div className="w-full max-w-md space-y-8 animate-fade-in">
@@ -284,125 +304,110 @@ export default function Auth() {
 
         <Card className="shadow-soft">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl">
-              {isLogin ? 'Welcome Back' : 'Create Account'}
-            </CardTitle>
-            <CardDescription>
-              {isLogin
-                ? 'Login to access your dashboard'
-                : 'Sign up to get started with your marketing assist'}
-            </CardDescription>
+            <CardTitle className="text-2xl">{isLogin ? t("auth.welcomeBack") : t("auth.createAccount")}</CardTitle>
+            <CardDescription>{isLogin ? t("auth.loginSubtitle") : t("auth.signupSubtitle")}</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Role Selection */}
               <div className="space-y-3">
-                <Label>Login as</Label>
+                <Label>{t("auth.loginAs")}</Label>
                 <RadioGroup
                   value={selectedRole}
                   onValueChange={(value) => setSelectedRole(value as AppRole)}
                   className="grid grid-cols-2 gap-4"
                 >
                   <div>
-                    <RadioGroupItem
-                      value="user"
-                      id="user"
-                      className="peer sr-only"
-                    />
+                    <RadioGroupItem value="user" id="user" className="peer sr-only" />
                     <Label
                       htmlFor="user"
                       className="flex flex-col items-center justify-between rounded-lg border-2 border-muted bg-card p-4 hover:bg-muted/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all"
                     >
                       <Briefcase className="mb-2 h-6 w-6 text-primary" />
-                      <span className="text-sm font-medium">Business Owner</span>
-                      <span className="text-xs text-muted-foreground">Client</span>
+                      <span className="text-sm font-medium">{t("auth.businessOwner")}</span>
+                      <span className="text-xs text-muted-foreground">{t("auth.client")}</span>
                     </Label>
                   </div>
                   <div>
-                    <RadioGroupItem
-                      value="assist"
-                      id="assist"
-                      className="peer sr-only"
-                    />
+                    <RadioGroupItem value="assist" id="assist" className="peer sr-only" />
                     <Label
                       htmlFor="assist"
                       className="flex flex-col items-center justify-between rounded-lg border-2 border-muted bg-card p-4 hover:bg-muted/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all"
                     >
                       <UserCircle className="mb-2 h-6 w-6 text-accent" />
-                      <span className="text-sm font-medium">Marketing Assist</span>
-                      <span className="text-xs text-muted-foreground">Freelancer</span>
+                      <span className="text-sm font-medium">{t("auth.marketingAssist")}</span>
+                      <span className="text-xs text-muted-foreground">{t("auth.freelancer")}</span>
                     </Label>
                   </div>
                 </RadioGroup>
               </div>
 
               {/* Name (signup only) */}
-              {!isLogin && (
-                selectedRole === 'assist' ? (
+              {!isLogin &&
+                (selectedRole === "assist" ? (
                   <div className="space-y-2">
-                    <Label htmlFor="firstName">Full Name</Label>
+                    <Label htmlFor="firstName">{t("auth.fullName")}</Label>
                     <Input
                       id="firstName"
                       placeholder="John Doe"
                       value={formData.firstName}
-                      onChange={(e) => setFormData({ ...formData, firstName: e.target.value, lastName: '' })}
-                      className={errors.firstName ? 'border-destructive' : ''}
+                      onChange={(e) => setFormData({ ...formData, firstName: e.target.value, lastName: "" })}
+                      className={errors.firstName ? "border-destructive" : ""}
                     />
                     {errors.firstName && <p className="text-sm text-destructive">{errors.firstName}</p>}
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name</Label>
+                      <Label htmlFor="firstName">{t("auth.firstName")}</Label>
                       <Input
                         id="firstName"
                         placeholder="John"
                         value={formData.firstName}
                         onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                        className={errors.firstName ? 'border-destructive' : ''}
+                        className={errors.firstName ? "border-destructive" : ""}
                       />
                       {errors.firstName && <p className="text-sm text-destructive">{errors.firstName}</p>}
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name</Label>
+                      <Label htmlFor="lastName">{t("auth.lastName")}</Label>
                       <Input
                         id="lastName"
                         placeholder="Doe"
                         value={formData.lastName}
                         onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                        className={errors.lastName ? 'border-destructive' : ''}
+                        className={errors.lastName ? "border-destructive" : ""}
                       />
                       {errors.lastName && <p className="text-sm text-destructive">{errors.lastName}</p>}
                     </div>
                   </div>
-                )
-              )}
+                ))}
 
               {/* Email */}
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t("auth.email")}</Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="your@email.com"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className={errors.email ? 'border-destructive' : ''}
+                  className={errors.email ? "border-destructive" : ""}
                 />
                 {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
               </div>
 
               {/* Password */}
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t("auth.password")}</Label>
                 <div className="relative">
                   <Input
                     id="password"
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className={errors.password ? 'border-destructive pr-10' : 'pr-10'}
+                    className={errors.password ? "border-destructive pr-10" : "pr-10"}
                   />
                   <button
                     type="button"
@@ -418,23 +423,18 @@ export default function Auth() {
                   <div className="pt-1 text-right">
                     <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
                       <DialogTrigger asChild>
-                        <button
-                          type="button"
-                          className="text-xs text-primary hover:underline font-medium"
-                        >
-                          Forgot password?
+                        <button type="button" className="text-xs text-primary hover:underline font-medium">
+                          {t("auth.forgotPassword")}
                         </button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Reset password</DialogTitle>
-                          <DialogDescription>
-                            Enter your email and we’ll send you a link to set a new password.
-                          </DialogDescription>
+                          <DialogTitle>{t("auth.resetTitle")}</DialogTitle>
+                          <DialogDescription>{t("auth.resetDesc")}</DialogDescription>
                         </DialogHeader>
 
                         <div className="space-y-2">
-                          <Label htmlFor="forgotEmail">Email</Label>
+                          <Label htmlFor="forgotEmail">{t("auth.email")}</Label>
                           <Input
                             id="forgotEmail"
                             type="email"
@@ -451,14 +451,10 @@ export default function Auth() {
                             onClick={() => setForgotOpen(false)}
                             disabled={forgotSubmitting}
                           >
-                            Cancel
+                            {t("auth.cancel")}
                           </Button>
-                          <Button
-                            type="button"
-                            onClick={handleForgotPassword}
-                            disabled={forgotSubmitting}
-                          >
-                            {forgotSubmitting ? 'Sending...' : 'Send reset link'}
+                          <Button type="button" onClick={handleForgotPassword} disabled={forgotSubmitting}>
+                            {forgotSubmitting ? t("auth.sending") : t("auth.sendReset")}
                           </Button>
                         </DialogFooter>
                       </DialogContent>
@@ -470,52 +466,50 @@ export default function Auth() {
               {/* Confirm Password (signup only) */}
               {!isLogin && (
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <Label htmlFor="confirmPassword">{t("auth.confirmPassword")}</Label>
                   <Input
                     id="confirmPassword"
                     type="password"
                     placeholder="••••••••"
                     value={formData.confirmPassword}
                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                    className={errors.confirmPassword ? 'border-destructive' : ''}
+                    className={errors.confirmPassword ? "border-destructive" : ""}
                   />
-                  {errors.confirmPassword && (
-                    <p className="text-sm text-destructive">{errors.confirmPassword}</p>
-                  )}
+                  {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword}</p>}
                 </div>
               )}
 
               <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? 'Please wait...' : isLogin ? 'Login' : 'Create Account'}
+                {isSubmitting ? t("auth.pleaseWait") : isLogin ? t("auth.login") : t("auth.createAccount")}
               </Button>
             </form>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
             <div className="text-sm text-center text-muted-foreground">
-              {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
+              {isLogin ? t("auth.dontHave") : t("auth.alreadyHave")} {" "}
               <button
                 type="button"
                 onClick={() => {
                   setIsLogin(!isLogin);
                   setErrors({});
-                  setFormData({ firstName: '', lastName: '', email: '', password: '', confirmPassword: '' });
+                  setFormData({ firstName: "", lastName: "", email: "", password: "", confirmPassword: "" });
                 }}
                 className="text-primary hover:underline font-medium"
               >
-                {isLogin ? 'Sign up' : 'Login'}
+                {isLogin ? t("auth.signUp") : t("auth.login")}
               </button>
             </div>
           </CardFooter>
         </Card>
 
         <p className="text-center text-xs text-muted-foreground">
-          By continuing, you agree to our{' '}
+          {t("auth.agree")} {" "}
           <Link to="/terms" className="underline hover:text-foreground">
-            Terms of Service
-          </Link>{' '}
-          and{' '}
+            {t("auth.terms")}
+          </Link>{" "}
+          and {" "}
           <Link to="/privacy" className="underline hover:text-foreground">
-            Privacy Policy
+            {t("auth.privacy")}
           </Link>
         </p>
       </div>
