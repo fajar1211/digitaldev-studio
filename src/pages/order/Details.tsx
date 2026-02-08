@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { State, City } from "country-state-city";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,23 @@ const schema = z.object({
 });
 
 type FormValues = z.infer<typeof schema>;
+
+const KALIMANTAN_BARAT_CITIES = [
+  "Kabupaten Bengkayang",
+  "Kabupaten Kapuas Hulu",
+  "Kabupaten Kayong Utara",
+  "Kabupaten Ketapang",
+  "Kabupaten Kubu Raya",
+  "Kabupaten Landak",
+  "Kabupaten Melawi",
+  "Kabupaten Mempawah",
+  "Kabupaten Sambas",
+  "Kabupaten Sanggau",
+  "Kabupaten Sekadau",
+  "Kabupaten Sintang",
+  "Kota Pontianak",
+  "Kota Singkawang",
+];
 
 export default function Details() {
   const navigate = useNavigate();
@@ -56,6 +73,95 @@ export default function Details() {
     mode: "onChange",
     reValidateMode: "onChange",
   });
+
+  const provinceValue = useWatch({ control: form.control, name: "provinceCode" });
+
+  const selectedProvince = useMemo(() => {
+    if (!provinceValue) return undefined;
+    const byIso = provinces.find((p) => p.isoCode === provinceValue);
+    if (byIso) return byIso;
+    const byName = provinces.find((p) => String(p.name).toLowerCase() === String(provinceValue).toLowerCase());
+    return byName;
+  }, [provinceValue, provinces]);
+
+  const resolvedProvinceCode = useMemo(() => {
+    const iso = selectedProvince?.isoCode ?? "";
+    if (!iso) return "";
+    const parts = String(iso).split("-");
+    return parts[parts.length - 1];
+  }, [selectedProvince]);
+
+  const selectedProvinceName = useMemo(() => selectedProvince?.name ?? "", [selectedProvince]);
+
+  const libraryCityNames = useMemo(() => {
+    if (!resolvedProvinceCode) return [] as string[];
+
+    const byState = City.getCitiesOfState("ID", resolvedProvinceCode) || [];
+    if (byState.length > 0) return byState.map((c) => c.name);
+
+    // Some datasets may not resolve via getCitiesOfState for certain provinces.
+    // Filter from all Indonesian cities by stateCode (handle "KB" vs "ID-KB" formats).
+    const normalize = (code: unknown) => {
+      const s = String(code ?? "").trim();
+      if (!s) return "";
+      const parts = s.split("-");
+      return parts[parts.length - 1].toLowerCase();
+    };
+
+    const target = normalize(resolvedProvinceCode);
+    const all = City.getCitiesOfCountry("ID") || [];
+    return all.filter((c) => normalize((c as any).stateCode) === target).map((c) => c.name);
+  }, [resolvedProvinceCode]);
+
+  const [apiCityNames, setApiCityNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Use API fallback only when library gives no cities.
+    if (!resolvedProvinceCode) {
+      setApiCityNames([]);
+      return;
+    }
+    if (libraryCityNames.length > 0) {
+      setApiCityNames([]);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const norm = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    (async () => {
+      try {
+        const provRes = await fetch("https://emsifa.github.io/api-wilayah-indonesia/api/provinces.json", {
+          signal: controller.signal,
+        });
+        const provJson = (await provRes.json()) as Array<{ id: string; name: string }>;
+        const targetName = norm(selectedProvinceName);
+        const matched = provJson.find((p) => norm(p.name) === targetName);
+        if (!matched) {
+          setApiCityNames([]);
+          return;
+        }
+
+        const regRes = await fetch(
+          `https://emsifa.github.io/api-wilayah-indonesia/api/regencies/${matched.id}.json`,
+          { signal: controller.signal },
+        );
+        const regJson = (await regRes.json()) as Array<{ id: string; name: string }>;
+        setApiCityNames(regJson.map((r) => r.name).sort((a, b) => a.localeCompare(b, "id")));
+      } catch (e) {
+        if ((e as any)?.name === "AbortError") return;
+        setApiCityNames([]);
+      }
+    })();
+
+    return () => controller.abort();
+  }, [libraryCityNames.length, resolvedProvinceCode, selectedProvinceName]);
 
   return (
     <OrderLayout title={t("order.step.details")} step="details" sidebar={<OrderSummaryCard showEstPrice={false} />}>
@@ -170,31 +276,12 @@ export default function Details() {
                   control={form.control}
                   name="city"
                   render={({ field }) => {
-                    const provinceValue = form.watch("provinceCode");
+                    let cityNames = (libraryCityNames.length > 0 ? libraryCityNames : apiCityNames).slice();
 
-                    // provinceCode is supposed to store State.isoCode, but older/saved values could be the province name.
-                    // Normalize to a valid isoCode so City.getCitiesOfState always receives the expected stateCode.
-                    const resolvedProvinceCode = (() => {
-                      if (!provinceValue) return "";
-                      const byIso = provinces.find((p) => p.isoCode === provinceValue);
-                      if (byIso) return byIso.isoCode;
-                      const byName = provinces.find(
-                        (p) => String(p.name).toLowerCase() === String(provinceValue).toLowerCase(),
-                      );
-                      return byName?.isoCode ?? "";
-                    })();
-
-                    const cities = (() => {
-                      if (!resolvedProvinceCode) return [];
-                      const byState = City.getCitiesOfState("ID", resolvedProvinceCode) || [];
-                      if (byState.length > 0) return byState;
-
-                      // Fallback: some datasets may not resolve via getCitiesOfState for certain provinces.
-                      // Filter from all Indonesian cities by stateCode.
-                      const all = City.getCitiesOfCountry("ID") || [];
-                      return all.filter((c) => String((c as any).stateCode) === resolvedProvinceCode);
-                    })();
-                    const cityItems = [...cities].sort((a, b) => String(a.name).localeCompare(String(b.name), "id"));
+                    const isKalbar = resolvedProvinceCode.toUpperCase() === "KB" || /kalimantan\s+barat/i.test(selectedProvinceName);
+                    if (cityNames.length === 0 && isKalbar) {
+                      cityNames = KALIMANTAN_BARAT_CITIES.slice();
+                    }
 
                     return (
                       <FormItem>
@@ -206,9 +293,9 @@ export default function Details() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {cityItems.map((c) => (
-                              <SelectItem key={`${c.stateCode}-${c.name}`} value={c.name}>
-                                {c.name}
+                            {cityNames.map((name) => (
+                              <SelectItem key={name} value={name}>
+                                {name}
                               </SelectItem>
                             ))}
                           </SelectContent>
