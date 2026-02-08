@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import { OrderLayout } from "@/components/order/OrderLayout";
 import { OrderSummaryCard } from "@/components/order/OrderSummaryCard";
-import { OrderPackagesPreview } from "@/components/order/OrderPackagesPreview";
+import { OrderWebsitePackagesCards } from "@/components/order/OrderWebsitePackagesCards";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +52,7 @@ export default function SubscriptionPlan() {
   return (
     <OrderLayout title={t("order.step.plan")} step="plan" sidebar={<OrderSummaryCard />}>
       <div className="space-y-6">
-        <OrderPackagesPreview />
+        <OrderWebsitePackagesCards />
 
         {state.selectedPackageId ? (
           <Card>
