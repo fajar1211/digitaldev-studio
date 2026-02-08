@@ -151,12 +151,11 @@ export default function Packages() {
                       <CardHeader className="text-center pb-4">
                         <CardDescription className="text-primary font-medium uppercase text-xs">{pkg.type}</CardDescription>
                         <CardTitle className="text-xl">{pkg.name}</CardTitle>
-                         <div className="mt-4">
--                          <span className="text-4xl font-bold text-foreground">${Number(pkg.price ?? 0).toFixed(0)}</span>
-+                          <span className="text-4xl font-bold text-foreground">
-+                            Rp {Number(pkg.price ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 0 })}
-+                          </span>
-                         </div>
+                        <div className="mt-4">
+                          <span className="text-4xl font-bold text-foreground">
+                            Rp {Number(pkg.price ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                          </span>
+                        </div>
                       </CardHeader>
                       <CardContent className="flex-1">
                         {pkg.description && <p className="text-sm text-muted-foreground text-center mb-6">{pkg.description}</p>}

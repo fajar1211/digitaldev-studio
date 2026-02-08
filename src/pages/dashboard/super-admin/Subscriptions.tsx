@@ -430,7 +430,7 @@ export default function SuperAdminSubscriptions() {
                       />
                     </div>
                     <div className="md:col-span-2">
-                      <Label className="text-xs">Price (USD)</Label>
+                      <Label className="text-xs">Price (IDR)</Label>
                       <Input
                         value={String(r.price_usd)}
                         onChange={(e) =>
