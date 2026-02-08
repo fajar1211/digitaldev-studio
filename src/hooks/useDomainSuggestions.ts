@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-export type DomainSuggestionStatus = "available" | "unavailable" | "premium" | "unknown";
+export type DomainSuggestionStatus = "available" | "unavailable" | "premium" | "blocked" | "unknown";
 
 export type DomainSuggestionItem = {
   domain: string;
@@ -82,11 +82,26 @@ export function useDomainSuggestions(query: string, { enabled = true, debounceMs
           }),
         );
 
+        const statusFromAvailability = (availability: string): DomainSuggestionStatus => {
+          switch (availability) {
+            case "true":
+              return "available";
+            case "false":
+              return "unavailable";
+            case "premium":
+              return "premium";
+            case "blocked":
+              return "blocked";
+            default:
+              return "unknown";
+          }
+        };
+
         const items: DomainSuggestionItem[] = results
-          .filter((r) => r.availability === "true")
+          .filter((r) => r.availability !== "error")
           .map((r) => ({
             domain: r.domain,
-            status: "available",
+            status: statusFromAvailability(r.availability),
             price_usd: null,
             currency: null,
           }));

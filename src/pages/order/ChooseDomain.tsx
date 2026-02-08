@@ -47,7 +47,7 @@ export default function ChooseDomain() {
   const keyword = useMemo(() => normalizeKeyword(lastChecked), [lastChecked]);
 
   const { loading, error, items } = useDomainSuggestions(keyword, { enabled: Boolean(keyword) });
-  const availableItems = useMemo(() => items.filter((it) => it.status === "available" && it.domain).slice(0, 10), [items]);
+  const visibleItems = useMemo(() => items.filter((it) => it.domain).slice(0, 10), [items]);
 
   const [selectedDomain, setSelectedDomain] = useState<string>(state.domain || "");
 
@@ -99,20 +99,32 @@ export default function ChooseDomain() {
                             Checking…
                           </td>
                         </tr>
-                      ) : availableItems.length === 0 ? (
+                      ) : visibleItems.length === 0 ? (
                         <tr className="border-t">
                           <td className="px-3 py-3 text-muted-foreground" colSpan={4}>
                             Tidak ada domain available untuk keyword ini dari 10 TLD favorit yang dicek.
                           </td>
                         </tr>
                       ) : (
-                        availableItems.map((it) => {
+                        visibleItems.map((it) => {
                           const isSelected = selectedDomain === it.domain;
+                          const isAvailable = it.status === "available";
+                          const statusLabel =
+                            it.status === "available"
+                              ? "Available"
+                              : it.status === "unavailable"
+                                ? "Unavailable"
+                                : it.status === "premium"
+                                  ? "Premium"
+                                  : it.status === "blocked"
+                                    ? "Blocked"
+                                    : "Unknown";
+
                           return (
                             <tr key={it.domain} className="border-t">
                               <td className="px-3 py-2 font-medium text-foreground">{it.domain}</td>
                               <td className="px-3 py-2">
-                                <Badge variant={badgeVariant("available")}>Available</Badge>
+                                <Badge variant={badgeVariant(it.status as DomainStatus)}>{statusLabel}</Badge>
                               </td>
                               <td className="px-3 py-2">
                                 {it.price_usd == null ? (
@@ -128,13 +140,15 @@ export default function ChooseDomain() {
                                 <Button
                                   type="button"
                                   variant={isSelected ? "secondary" : "outline"}
+                                  disabled={!isAvailable}
                                   onClick={() => {
+                                    if (!isAvailable) return;
                                     setSelectedDomain(it.domain);
                                     setDomain(it.domain);
                                     setDomainStatus("available");
                                   }}
                                 >
-                                  {isSelected ? "Dipilih" : "Pilih"}
+                                  {!isAvailable ? "Tidak tersedia" : isSelected ? "Dipilih" : "Pilih"}
                                 </Button>
                               </td>
                             </tr>
@@ -150,9 +164,11 @@ export default function ChooseDomain() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground">
-                      Dicek: 3 TLD favorit (.com, .id, .co.id). Hanya domain yang available ditampilkan.
+                      Dicek: 3 TLD favorit (.com, .id, .co.id). Status ditampilkan (Available/Unavailable/Premium/Blocked).
                     </p>
-                    <p className="text-xs text-muted-foreground">Hasil available: {availableItems.length}.</p>
+                    <p className="text-xs text-muted-foreground">
+                      Hasil available: {visibleItems.filter((it) => it.status === "available").length} dari {visibleItems.length}.
+                    </p>
                   </div>
 
                   {pricing.domainPriceUsd == null || !selectedDomain ? null : (
