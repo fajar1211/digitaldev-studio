@@ -25,6 +25,16 @@ function formatUsd(value: number) {
   }
 }
 
+function tldKeyFromDomain(domain: string): string | null {
+  const d = String(domain ?? "").trim().toLowerCase();
+  if (!d) return null;
+  // Support the 3 TLDs we check, including the multi-part ".co.id"
+  if (d.endsWith(".co.id")) return "co-id";
+  if (d.endsWith(".com")) return "com";
+  if (d.endsWith(".id")) return "id";
+  return d.includes(".") ? d.split(".").pop() ?? null : null;
+}
+
 function normalizeKeyword(raw: string) {
   const v = String(raw ?? "")
     .trim()
@@ -59,6 +69,23 @@ export default function ChooseDomain() {
 
   // Pricing depends on selected domain
   const { pricing } = useOrderPublicSettings(selectedDomain || lastChecked);
+
+  const tldPriceMap = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const row of pricing.tldPrices ?? []) {
+      const key = String((row as any)?.tld ?? "").trim().toLowerCase();
+      const price = Number((row as any)?.price_usd ?? NaN);
+      if (key && Number.isFinite(price)) m.set(key, price);
+    }
+    return m;
+  }, [pricing.tldPrices]);
+
+  const selectedPriceUsd = useMemo(() => {
+    if (!selectedDomain) return null;
+    const key = tldKeyFromDomain(selectedDomain);
+    if (!key) return null;
+    return tldPriceMap.get(key) ?? null;
+  }, [selectedDomain, tldPriceMap]);
 
   const canContinue = Boolean(selectedDomain);
 
@@ -102,7 +129,7 @@ export default function ChooseDomain() {
                       ) : visibleItems.length === 0 ? (
                         <tr className="border-t">
                           <td className="px-3 py-3 text-muted-foreground" colSpan={4}>
-                            Tidak ada domain available untuk keyword ini dari 10 TLD favorit yang dicek.
+                            Tidak ada domain yang tersedia untuk keyword ini dari 3 TLD favorit yang dicek.
                           </td>
                         </tr>
                       ) : (
@@ -120,6 +147,9 @@ export default function ChooseDomain() {
                                     ? "Blocked"
                                     : "Unknown";
 
+                          const tldKey = tldKeyFromDomain(it.domain);
+                          const rowPriceUsd = isAvailable && tldKey ? (tldPriceMap.get(tldKey) ?? null) : null;
+
                           return (
                             <tr key={it.domain} className="border-t">
                               <td className="px-3 py-2 font-medium text-foreground">{it.domain}</td>
@@ -127,12 +157,12 @@ export default function ChooseDomain() {
                                 <Badge variant={badgeVariant(it.status as DomainStatus)}>{statusLabel}</Badge>
                               </td>
                               <td className="px-3 py-2">
-                                {it.price_usd == null ? (
+                                {rowPriceUsd == null ? (
                                   <span className="text-muted-foreground">—</span>
                                 ) : (
                                   <div className="flex flex-col items-start">
-                                    <span className="text-base font-semibold text-foreground">{formatUsd(it.price_usd)}</span>
-                                    <span className="text-xs text-muted-foreground line-through">{formatUsd(it.price_usd * 1.25)}</span>
+                                    <span className="text-base font-semibold text-foreground">{formatUsd(rowPriceUsd)}</span>
+                                    <span className="text-xs text-muted-foreground line-through">{formatUsd(rowPriceUsd * 1.25)}</span>
                                   </div>
                                 )}
                               </td>
@@ -171,10 +201,10 @@ export default function ChooseDomain() {
                     </p>
                   </div>
 
-                  {pricing.domainPriceUsd == null || !selectedDomain ? null : (
+                  {selectedPriceUsd == null || !selectedDomain ? null : (
                     <div className="text-right">
                       <div className="text-sm text-muted-foreground">Estimasi harga domain terpilih</div>
-                      <div className="text-base font-semibold text-foreground">{formatUsd(pricing.domainPriceUsd)}</div>
+                      <div className="text-base font-semibold text-foreground">{formatUsd(selectedPriceUsd)}</div>
                     </div>
                   )}
                 </div>
