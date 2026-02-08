@@ -24,7 +24,7 @@ export const dict: Dict = {
   // Home
   "home.seoTitle": { id: "EasyMarketingAssist | Pemasaran Digital Mudah", en: "EasyMarketingAssist | Easy Digital Marketing" },
   "home.seoDesc": { id: "Cari domain dan dapatkan website profesional dalam hitungan menit.", en: "Search a domain and get a professional website in minutes." },
-  "home.h1a": { id: "Solusi Pemasaran Digital Profesional", en: "Easy Digital Marketing for" },
+  "home.h1a": { id: "Pemasaran Digital Mudah untuk", en: "Easy Digital Marketing for" },
   "home.h1b": { id: "Pemilik Bisnis yang Sibuk", en: "Busy Business Owners" },
   "home.heroSub": {
     id: "Cari domain dan mulai membangun website profesional dengan mudah.",
