@@ -13,12 +13,8 @@ import { useOrder } from "@/contexts/OrderContext";
 import { useOrderPublicSettings } from "@/hooks/useOrderPublicSettings";
 import { useI18n } from "@/hooks/useI18n";
 
-function formatUsd(value: number) {
-  try {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
-  } catch {
-    return `$${value.toFixed(2)}`;
-  }
+function formatIdr(value: number) {
+  return `Rp ${Math.round(value).toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;
 }
 
 export default function SubscriptionPlan() {
@@ -110,7 +106,7 @@ export default function SubscriptionPlan() {
                       </div>
 
                       <div className="mt-4">
-                        <p className="text-2xl font-bold text-foreground">{opt.totalUsd == null ? "—" : formatUsd(opt.totalUsd)}</p>
+                        <p className="text-2xl font-bold text-foreground">{opt.totalUsd == null ? "—" : formatIdr(opt.totalUsd)}</p>
                         <p className="mt-1 text-xs text-muted-foreground">{t("order.totalFor", { years: opt.years })}</p>
                       </div>
                     </button>

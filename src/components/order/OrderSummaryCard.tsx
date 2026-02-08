@@ -12,12 +12,8 @@ export function OrderSummaryCard({ showEstPrice = true }: { showEstPrice?: boole
   const { pricing, contact, subscriptionPlans } = useOrderPublicSettings(state.domain, state.selectedPackageId);
   const { total: addOnsTotal } = useOrderAddOns({ packageId: state.selectedPackageId, quantities: state.addOns ?? {} });
 
-  const formatUsd = (value: number) => {
-    try {
-      return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
-    } catch {
-      return `$${value.toFixed(2)}`;
-    }
+  const formatIdr = (value: number) => {
+    return `Rp ${Math.round(value).toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;
   };
 
   const whatsappHref = (() => {
@@ -71,7 +67,7 @@ export function OrderSummaryCard({ showEstPrice = true }: { showEstPrice?: boole
   const estTotalLabel = (() => {
     if (!showEstPrice) return null;
     if (totalAfterPromoUsd == null) return "—";
-    return formatUsd(totalAfterPromoUsd);
+    return formatIdr(totalAfterPromoUsd);
   })();
 
   return (
@@ -96,7 +92,7 @@ export function OrderSummaryCard({ showEstPrice = true }: { showEstPrice?: boole
               {addOnsTotal > 0 ? (
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm text-muted-foreground">Add-ons</span>
-                  <span className="text-sm font-medium text-foreground">{formatUsd(addOnsTotal)}</span>
+                  <span className="text-sm font-medium text-foreground">{formatIdr(addOnsTotal)}</span>
                 </div>
               ) : null}
 
@@ -108,7 +104,7 @@ export function OrderSummaryCard({ showEstPrice = true }: { showEstPrice?: boole
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm text-muted-foreground">{t("order.promo")}</span>
                   <span className="text-sm font-medium text-foreground truncate max-w-[220px]">
-                    {state.appliedPromo.code} (-{formatUsd(promoDiscountUsd)})
+                    {state.appliedPromo.code} (-{formatIdr(promoDiscountUsd)})
                   </span>
                 </div>
               ) : null}
