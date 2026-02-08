@@ -22,6 +22,8 @@ export type OrderState = {
   selectedPackageName: string | null;
   /** key: package_add_ons.id */
   addOns: Record<string, number>;
+  /** key: subscription_add_ons.id */
+  subscriptionAddOns: Record<string, boolean>;
   subscriptionYears: number | null;
   details: OrderDetails;
   promoCode: string;
@@ -40,6 +42,7 @@ type OrderContextValue = {
   setTemplate: (template: { id: string; name: string } | null) => void;
   setPackage: (pkg: { id: string; name: string } | null) => void;
   setAddOnQuantity: (addOnId: string, quantity: number) => void;
+  setSubscriptionAddOnSelected: (addOnId: string, selected: boolean) => void;
   setSubscriptionYears: (years: number | null) => void;
   setDetails: (patch: Partial<OrderDetails>) => void;
   setPromoCode: (code: string) => void;
@@ -57,6 +60,7 @@ const defaultState: OrderState = {
   selectedPackageId: null,
   selectedPackageName: null,
   addOns: {},
+  subscriptionAddOns: {},
   subscriptionYears: null,
   details: {
     name: "",
@@ -126,6 +130,15 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const setSubscriptionAddOnSelected = useCallback((addOnId: string, selected: boolean) => {
+    setState((s) => {
+      const next = { ...(s.subscriptionAddOns ?? {}) };
+      if (!selected) delete next[addOnId];
+      else next[addOnId] = true;
+      return { ...s, subscriptionAddOns: next };
+    });
+  }, []);
+
   const setSubscriptionYears = useCallback((subscriptionYears: number | null) => setState((s) => ({ ...s, subscriptionYears })), []);
   const setDetails = useCallback((patch: Partial<OrderDetails>) => setState((s) => ({ ...s, details: { ...s.details, ...patch } })), []);
   const setPromoCode = useCallback((promoCode: string) => setState((s) => ({ ...s, promoCode })), []);
@@ -140,13 +153,14 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       setTemplate,
       setPackage,
       setAddOnQuantity,
+      setSubscriptionAddOnSelected,
       setSubscriptionYears,
       setDetails,
       setPromoCode,
       setAppliedPromo,
       reset,
     };
-  }, [reset, setAddOnQuantity, setAppliedPromo, setDetails, setDomain, setDomainStatus, setPackage, setPromoCode, setSubscriptionYears, setTemplate, state]);
+  }, [reset, setAddOnQuantity, setAppliedPromo, setDetails, setDomain, setDomainStatus, setPackage, setPromoCode, setSubscriptionAddOnSelected, setSubscriptionYears, setTemplate, state]);
 
   return <OrderContext.Provider value={value}>{children}</OrderContext.Provider>;
 }

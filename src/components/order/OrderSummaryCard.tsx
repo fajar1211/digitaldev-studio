@@ -4,13 +4,16 @@ import { Separator } from "@/components/ui/separator";
 import { useOrder } from "@/contexts/OrderContext";
 import { useOrderPublicSettings } from "@/hooks/useOrderPublicSettings";
 import { useOrderAddOns } from "@/hooks/useOrderAddOns";
+import { useSubscriptionAddOns } from "@/hooks/useSubscriptionAddOns";
 import { useI18n } from "@/hooks/useI18n";
 
 export function OrderSummaryCard({ showEstPrice = true }: { showEstPrice?: boolean }) {
   const { t, lang } = useI18n();
   const { state } = useOrder();
   const { contact, subscriptionPlans } = useOrderPublicSettings(state.domain, state.selectedPackageId);
-  const { total: addOnsTotal } = useOrderAddOns({ packageId: state.selectedPackageId, quantities: state.addOns ?? {} });
+  const { total: packageAddOnsTotal } = useOrderAddOns({ packageId: state.selectedPackageId, quantities: state.addOns ?? {} });
+  const { total: subscriptionAddOnsTotal } = useSubscriptionAddOns({ selected: state.subscriptionAddOns ?? {} });
+  const addOnsTotal = packageAddOnsTotal + subscriptionAddOnsTotal;
 
   const formatIdr = (value: number) => {
     return `Rp ${Math.round(value).toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;

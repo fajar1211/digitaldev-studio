@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { Plus, Save, Trash2 } from "lucide-react";
@@ -27,6 +28,15 @@ type PlanRow = {
   years: number;
   label: string;
   price_usd: number;
+  is_active: boolean;
+  sort_order: number;
+};
+
+type SubscriptionAddOnRow = {
+  id?: string;
+  label: string;
+  description: string;
+  price_idr: number;
   is_active: boolean;
   sort_order: number;
 };
@@ -71,6 +81,11 @@ export default function SuperAdminSubscriptions() {
   const [plansLoading, setPlansLoading] = useState(true);
   const [plansSaving, setPlansSaving] = useState(false);
   const [plans, setPlans] = useState<PlanRow[]>([]);
+
+  const [addOnsLoading, setAddOnsLoading] = useState(true);
+  const [addOnsSaving, setAddOnsSaving] = useState(false);
+  const [isEditingAddOns, setIsEditingAddOns] = useState(false);
+  const [addOns, setAddOns] = useState<SubscriptionAddOnRow[]>([]);
 
   const fetchDomainPricing = async () => {
     setPricingLoading(true);
@@ -164,9 +179,44 @@ export default function SuperAdminSubscriptions() {
     }
   };
 
+  const fetchAddOns = async () => {
+    setAddOnsLoading(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from("subscription_add_ons")
+        .select("id,label,description,price_idr,is_active,sort_order")
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+
+      const rows = Array.isArray(data)
+        ? (data as any[]).map((r) => ({
+            id: String(r.id),
+            label: String(r.label ?? ""),
+            description: String(r.description ?? ""),
+            price_idr: safeNumber(r.price_idr),
+            is_active: r.is_active !== false,
+            sort_order: asNumber(r.sort_order, 0),
+          }))
+        : [];
+
+      setAddOns(rows);
+    } catch (e: any) {
+      console.error(e);
+      const msg = e?.message || "Failed to load Subscription Add-ons";
+      if (String(msg).toLowerCase().includes("unauthorized")) {
+        navigate("/super-admin/login", { replace: true });
+        return;
+      }
+      toast({ variant: "destructive", title: "Error", description: msg });
+    } finally {
+      setAddOnsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchDomainPricing();
     fetchPlans();
+    fetchAddOns();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -241,7 +291,53 @@ export default function SuperAdminSubscriptions() {
     }
   };
 
+  const saveAddOns = async () => {
+    setAddOnsSaving(true);
+    try {
+      const payload = addOns.map((a, idx) => ({
+        id: a.id,
+        label: String(a.label ?? "").trim(),
+        description: String(a.description ?? "").trim() || null,
+        price_idr: Math.max(0, Math.floor(safeNumber(a.price_idr))),
+        is_active: a.is_active !== false,
+        sort_order: idx,
+      }));
+
+      // Basic validation
+      const invalid = payload.find((p) => !p.label);
+      if (invalid) {
+        toast({ variant: "destructive", title: "Save failed", description: "Label wajib diisi untuk semua add-on." });
+        return;
+      }
+
+      const { error } = await (supabase as any).from("subscription_add_ons").upsert(payload, { onConflict: "id" });
+      if (error) throw error;
+
+      toast({ title: "Saved", description: "Subscription add-ons updated." });
+      setIsEditingAddOns(false);
+      await fetchAddOns();
+    } catch (e: any) {
+      console.error(e);
+      toast({ variant: "destructive", title: "Failed to save", description: e?.message ?? "Unknown error" });
+    } finally {
+      setAddOnsSaving(false);
+    }
+  };
+
+  const deleteAddOn = async (id: string) => {
+    try {
+      const { error } = await (supabase as any).from("subscription_add_ons").delete().eq("id", id);
+      if (error) throw error;
+      toast({ title: "Deleted", description: "Add-on removed." });
+      await fetchAddOns();
+    } catch (e: any) {
+      console.error(e);
+      toast({ variant: "destructive", title: "Failed to delete", description: e?.message ?? "Unknown error" });
+    }
+  };
+
   const plansCountLabel = useMemo(() => String(plans.length), [plans.length]);
+  const addOnsCountLabel = useMemo(() => String(addOns.length), [addOns.length]);
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
@@ -254,146 +350,277 @@ export default function SuperAdminSubscriptions() {
         </TabsList>
 
         <TabsContent value="subscription">
-          <Card>
-            <CardHeader>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <CardTitle>Subscription Plans (Website)</CardTitle>
-                  <CardDescription>Manage “Choose plan duration” options on /order/subscription.</CardDescription>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <CardTitle>Subscription Plans (Website)</CardTitle>
+                    <CardDescription>Manage “Choose plan duration” options on /order/subscription.</CardDescription>
+                  </div>
+                  <Badge variant="outline">Total: {plansCountLabel}</Badge>
                 </div>
-                <Badge variant="outline">Total: {plansCountLabel}</Badge>
-              </div>
-            </CardHeader>
+              </CardHeader>
 
-            <CardContent className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-xs text-muted-foreground">
-                  {isEditingPlans ? "Edit mode: ON" : "Edit mode: OFF"}
+              <CardContent className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs text-muted-foreground">{isEditingPlans ? "Edit mode: ON" : "Edit mode: OFF"}</div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditingPlans((v) => !v)}
+                    disabled={plansSaving}
+                  >
+                    {isEditingPlans ? "Cancel" : "Edit"}
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsEditingPlans((v) => !v)}
-                  disabled={plansSaving}
-                >
-                  {isEditingPlans ? "Cancel" : "Edit"}
-                </Button>
-              </div>
 
-              {plansLoading ? <div className="text-sm text-muted-foreground">Loading...</div> : null}
+                {plansLoading ? <div className="text-sm text-muted-foreground">Loading...</div> : null}
 
-              {!plansLoading && plans.length ? (
-                plans.map((p, idx) => (
-                  <div key={`${p.years}-${idx}`} className="grid gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-6">
-                    <div>
-                      <Label className="text-xs">Years</Label>
-                      <Input
-                        value={String(p.years)}
-                        onChange={(e) =>
-                          setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, years: asNumber(e.target.value) } : x)))
-                        }
-                        inputMode="numeric"
-                        disabled={plansSaving || !isEditingPlans}
-                      />
-                    </div>
+                {!plansLoading && plans.length ? (
+                  plans.map((p, idx) => (
+                    <div key={`${p.years}-${idx}`} className="grid gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-6">
+                      <div>
+                        <Label className="text-xs">Years</Label>
+                        <Input
+                          value={String(p.years)}
+                          onChange={(e) =>
+                            setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, years: asNumber(e.target.value) } : x)))
+                          }
+                          inputMode="numeric"
+                          disabled={plansSaving || !isEditingPlans}
+                        />
+                      </div>
 
-                    <div className="md:col-span-2">
-                      <Label className="text-xs">Label</Label>
-                      <Input
-                        value={p.label}
-                        onChange={(e) =>
-                          setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, label: e.target.value } : x)))
-                        }
-                        disabled={plansSaving || !isEditingPlans}
-                      />
-                    </div>
+                      <div className="md:col-span-2">
+                        <Label className="text-xs">Label</Label>
+                        <Input
+                          value={p.label}
+                          onChange={(e) => setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, label: e.target.value } : x)))}
+                          disabled={plansSaving || !isEditingPlans}
+                        />
+                      </div>
 
-                    <div>
-                      <Label className="text-xs">Price (IDR)</Label>
-                      <Input
-                        value={String(p.price_usd ?? 0)}
-                        onChange={(e) =>
-                          setPlans((prev) =>
-                            prev.map((x, i) => (i === idx ? { ...x, price_usd: asNumber(e.target.value, 0) } : x)),
-                          )
-                        }
-                        inputMode="decimal"
-                        disabled={plansSaving || !isEditingPlans}
-                      />
-                    </div>
+                      <div>
+                        <Label className="text-xs">Price (IDR)</Label>
+                        <Input
+                          value={String(p.price_usd ?? 0)}
+                          onChange={(e) =>
+                            setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, price_usd: asNumber(e.target.value, 0) } : x)))
+                          }
+                          inputMode="decimal"
+                          disabled={plansSaving || !isEditingPlans}
+                        />
+                      </div>
 
-                    <div>
-                      <Label className="text-xs">Sort</Label>
-                      <Input
-                        value={String(p.sort_order)}
-                        onChange={(e) =>
-                          setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, sort_order: asNumber(e.target.value) } : x)))
-                        }
-                        inputMode="numeric"
-                        disabled={plansSaving || !isEditingPlans}
-                      />
-                    </div>
+                      <div>
+                        <Label className="text-xs">Sort</Label>
+                        <Input
+                          value={String(p.sort_order)}
+                          onChange={(e) =>
+                            setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, sort_order: asNumber(e.target.value) } : x)))
+                          }
+                          inputMode="numeric"
+                          disabled={plansSaving || !isEditingPlans}
+                        />
+                      </div>
 
-                    <div className="flex items-end justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <Badge variant={p.is_active ? "default" : "secondary"}>{p.is_active ? "On" : "Off"}</Badge>
+                      <div className="flex items-end justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant={p.is_active ? "default" : "secondary"}>{p.is_active ? "On" : "Off"}</Badge>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, is_active: !x.is_active } : x)))}
+                            disabled={plansSaving || !isEditingPlans}
+                          >
+                            Toggle
+                          </Button>
+                        </div>
                         <Button
                           type="button"
-                          size="sm"
                           variant="outline"
-                          onClick={() =>
-                            setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, is_active: !x.is_active } : x)))
-                          }
+                          size="icon"
+                          onClick={() => setPlans((prev) => prev.filter((_, i) => i !== idx))}
                           disabled={plansSaving || !isEditingPlans}
+                          aria-label="Remove plan"
                         >
-                          Toggle
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setPlans((prev) => prev.filter((_, i) => i !== idx))}
-                        disabled={plansSaving || !isEditingPlans}
-                        aria-label="Remove plan"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
+                  ))
+                ) : !plansLoading ? (
+                  <div className="text-sm text-muted-foreground">No plans yet. Click “Add Plan”.</div>
+                ) : null}
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      setPlans((prev) => [
+                        ...prev,
+                        {
+                          years: 1,
+                          label: "1 Year",
+                          price_usd: 0,
+                          is_active: true,
+                          sort_order: prev.length ? Math.max(...prev.map((x) => x.sort_order)) + 1 : 1,
+                        },
+                      ])
+                    }
+                    disabled={plansSaving || !isEditingPlans}
+                  >
+                    <Plus className="h-4 w-4 mr-2" /> Add Plan
+                  </Button>
+
+                  <Button type="button" onClick={savePlans} disabled={plansSaving || !isEditingPlans}>
+                    <Save className="h-4 w-4 mr-2" /> Save
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <CardTitle>Subscription Add-ons</CardTitle>
+                    <CardDescription>Checklist add-ons yang tampil di bawah pilihan durasi pada /order/subscription.</CardDescription>
                   </div>
-                ))
-              ) : !plansLoading ? (
-                <div className="text-sm text-muted-foreground">No plans yet. Click “Add Plan”.</div>
-              ) : null}
+                  <Badge variant="outline">Total: {addOnsCountLabel}</Badge>
+                </div>
+              </CardHeader>
 
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    setPlans((prev) => [
-                      ...prev,
-                      {
-                        years: 1,
-                        label: "1 Year",
-                        price_usd: 0,
-                        is_active: true,
-                        sort_order: prev.length ? Math.max(...prev.map((x) => x.sort_order)) + 1 : 1,
-                      },
-                    ])
-                  }
-                  disabled={plansSaving || !isEditingPlans}
-                >
-                  <Plus className="h-4 w-4 mr-2" /> Add Plan
-                </Button>
+              <CardContent className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs text-muted-foreground">{isEditingAddOns ? "Edit mode: ON" : "Edit mode: OFF"}</div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditingAddOns((v) => !v)}
+                    disabled={addOnsSaving}
+                  >
+                    {isEditingAddOns ? "Cancel" : "Edit"}
+                  </Button>
+                </div>
 
-                <Button type="button" onClick={savePlans} disabled={plansSaving || !isEditingPlans}>
-                  <Save className="h-4 w-4 mr-2" /> Save
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                {addOnsLoading ? <div className="text-sm text-muted-foreground">Loading...</div> : null}
+
+                {!addOnsLoading && addOns.length ? (
+                  <div className="space-y-3">
+                    {addOns.map((a, idx) => (
+                      <div key={a.id ?? `new-${idx}`} className="grid gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-12">
+                        <div className="md:col-span-3">
+                          <Label className="text-xs">Label</Label>
+                          <Input
+                            value={a.label}
+                            onChange={(e) => setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, label: e.target.value } : x)))}
+                            disabled={addOnsSaving || !isEditingAddOns}
+                            placeholder='e.g. Jasa Editing Website'
+                          />
+                        </div>
+
+                        <div className="md:col-span-4">
+                          <Label className="text-xs">Description</Label>
+                          <Input
+                            value={a.description}
+                            onChange={(e) => setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, description: e.target.value } : x)))}
+                            disabled={addOnsSaving || !isEditingAddOns}
+                            placeholder='Optional'
+                          />
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <Label className="text-xs">Price (IDR)</Label>
+                          <Input
+                            value={String(a.price_idr ?? 0)}
+                            onChange={(e) =>
+                              setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, price_idr: safeNumber(e.target.value) } : x)))
+                            }
+                            inputMode="numeric"
+                            disabled={addOnsSaving || !isEditingAddOns}
+                          />
+                        </div>
+
+                        <div className="md:col-span-1">
+                          <Label className="text-xs">Active</Label>
+                          <div className="pt-2">
+                            <Switch
+                              checked={Boolean(a.is_active)}
+                              onCheckedChange={(v) => setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, is_active: Boolean(v) } : x)))}
+                              disabled={addOnsSaving || !isEditingAddOns}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="md:col-span-1">
+                          <Label className="text-xs">Sort</Label>
+                          <Input
+                            value={String(a.sort_order ?? idx)}
+                            onChange={(e) =>
+                              setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, sort_order: asNumber(e.target.value, idx) } : x)))
+                            }
+                            inputMode="numeric"
+                            disabled={addOnsSaving || !isEditingAddOns}
+                          />
+                        </div>
+
+                        <div className="md:col-span-1 flex items-end justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={async () => {
+                              const id = String(a.id ?? "");
+                              setAddOns((prev) => prev.filter((_, i) => i !== idx));
+                              if (id) await deleteAddOn(id);
+                            }}
+                            disabled={addOnsSaving || !isEditingAddOns}
+                            aria-label="Remove add-on"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : !addOnsLoading ? (
+                  <div className="text-sm text-muted-foreground">No add-ons yet. Click “Add Add-on”.</div>
+                ) : null}
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      setAddOns((prev) => [
+                        ...prev,
+                        {
+                          label: "",
+                          description: "",
+                          price_idr: 0,
+                          is_active: true,
+                          sort_order: prev.length,
+                        },
+                      ])
+                    }
+                    disabled={addOnsSaving || !isEditingAddOns}
+                  >
+                    <Plus className="h-4 w-4 mr-2" /> Add Add-on
+                  </Button>
+
+                  <Button type="button" onClick={saveAddOns} disabled={addOnsSaving || !isEditingAddOns}>
+                    <Save className="h-4 w-4 mr-2" /> Save
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="domain">

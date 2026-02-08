@@ -9,6 +9,7 @@ import { PaymentConfirmDialog } from "@/components/order/PaymentConfirmDialog";
 import { useOrder } from "@/contexts/OrderContext";
 import { useOrderPublicSettings } from "@/hooks/useOrderPublicSettings";
 import { useOrderAddOns } from "@/hooks/useOrderAddOns";
+import { useSubscriptionAddOns } from "@/hooks/useSubscriptionAddOns";
 import { validatePromoCode } from "@/hooks/useOrderPromoCode";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/hooks/useI18n";
@@ -55,7 +56,9 @@ export default function Payment() {
   const effectivePackageId = state.selectedPackageId ?? pricing.defaultPackageId ?? null;
 
   const { rows: durationRows } = usePackageDurations(effectivePackageId);
-  const { total: addOnsTotal } = useOrderAddOns({ packageId: effectivePackageId, quantities: state.addOns ?? {} });
+  const { total: packageAddOnsTotal } = useOrderAddOns({ packageId: effectivePackageId, quantities: state.addOns ?? {} });
+  const { total: subscriptionAddOnsTotal } = useSubscriptionAddOns({ selected: state.subscriptionAddOns ?? {} });
+  const addOnsTotal = packageAddOnsTotal + subscriptionAddOnsTotal;
   const midtrans = useMidtransOrderSettings();
   const paypal = usePaypalOrderSettings();
 
