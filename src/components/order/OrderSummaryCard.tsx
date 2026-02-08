@@ -68,28 +68,26 @@ export function OrderSummaryCard({ showEstPrice = true }: { showEstPrice?: boole
     const months = Number(state.subscriptionYears) * 12;
     const discountPercent = discountByMonths.get(months) ?? 0;
 
+    // Align with SubscriptionPlan page:
+    // - treat missing domain/package price as 0 (so the summary matches what the user sees)
+    // - still return null when we truly have no meaningful base price
+    const baseAnnualIdr = Number(pricing.domainPriceUsd ?? 0) + Number(pricing.packagePriceUsd ?? 0);
+    if (!Number.isFinite(baseAnnualIdr) || baseAnnualIdr <= 0) return null;
+
     // Prefer Duration & Discount config (package_durations).
     if (discountByMonths.size > 0) {
-      const domain = pricing.domainPriceUsd ?? null;
-      const pkg = pricing.packagePriceUsd ?? null;
-      if (domain == null || pkg == null) return null;
-
-      const baseAnnual = domain + pkg;
-      const monthly = baseAnnual / 12;
+      const monthly = baseAnnualIdr / 12;
       return computeDiscountedTotal({ monthlyPrice: monthly, months, discountPercent });
     }
 
     // Fallback to legacy website_settings.order_subscription_plans price override.
     const selectedPlan = subscriptionPlans.find((p) => p.years === state.subscriptionYears);
-    const planOverrideUsd =
+    const planOverrideIdr =
       typeof selectedPlan?.price_usd === "number" && Number.isFinite(selectedPlan.price_usd) ? selectedPlan.price_usd : null;
-    if (planOverrideUsd != null) return planOverrideUsd;
+    if (planOverrideIdr != null) return planOverrideIdr;
 
-    const domainUsd = pricing.domainPriceUsd ?? null;
-    const pkgUsd = pricing.packagePriceUsd ?? null;
-    if (domainUsd == null || pkgUsd == null) return null;
-
-    return (domainUsd + pkgUsd) * state.subscriptionYears;
+    // Final fallback: base annual x years.
+    return baseAnnualIdr * state.subscriptionYears;
   })();
 
   const baseTotalUsd = (() => {
