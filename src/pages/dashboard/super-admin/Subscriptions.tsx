@@ -39,7 +39,12 @@ function asNumber(v: unknown, fallback = 0) {
 }
 
 function normalizeTld(input: unknown): string {
-  return String(input ?? "").trim().toLowerCase().replace(/^\./, "");
+  return String(input ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/^\.+/, "")
+    // support multi-part tld like "co.id" by converting to DB-friendly form "co-id"
+    .replace(/\./g, "-");
 }
 
 function safeNumber(v: unknown): number {
