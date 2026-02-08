@@ -7,9 +7,9 @@ import { DomainSearchBar } from "@/components/order/DomainSearchBar";
 import { OrderLayout } from "@/components/order/OrderLayout";
 import { OrderSummaryCard } from "@/components/order/OrderSummaryCard";
 import { useOrder } from "@/contexts/OrderContext";
-import { useDomainDuckCheck, type DomainDuckAvailability } from "@/hooks/useDomainDuckCheck";
 import { useOrderPublicSettings } from "@/hooks/useOrderPublicSettings";
 import { useI18n } from "@/hooks/useI18n";
+import { useDomainSuggestions } from "@/hooks/useDomainSuggestions";
 
 type DomainStatus = "available" | "unavailable" | "premium" | "blocked" | "unknown";
 
@@ -25,39 +25,42 @@ function formatUsd(value: number) {
   }
 }
 
+function normalizeKeyword(raw: string) {
+  const v = String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/$/, "")
+    .replace(/\s+/g, "");
+  if (!v) return "";
+  return v.includes(".") ? v.split(".")[0] : v;
+}
+
 export default function ChooseDomain() {
   const navigate = useNavigate();
   const { t } = useI18n();
   const [params] = useSearchParams();
   const initial = params.get("domain") ?? "";
   const { state, setDomain, setDomainStatus } = useOrder();
+
   const [lastChecked, setLastChecked] = useState<string>(state.domain || initial);
+  const keyword = useMemo(() => normalizeKeyword(lastChecked), [lastChecked]);
 
-  const { loading, error, availability } = useDomainDuckCheck(lastChecked, { enabled: Boolean(lastChecked) });
-  const { pricing } = useOrderPublicSettings(lastChecked);
+  const { loading, error, items } = useDomainSuggestions(keyword, { enabled: Boolean(keyword) });
+  const availableItems = useMemo(() => items.filter((it) => it.status === "available" && it.domain).slice(0, 10), [items]);
 
-  const status: DomainStatus | null = useMemo(() => {
-    if (!lastChecked) return null;
-    const a = availability as DomainDuckAvailability | null;
-    if (!a) return loading ? "unknown" : "unknown";
-    if (a === "true") return "available";
-    if (a === "false") return "unavailable";
-    if (a === "premium") return "premium";
-    if (a === "blocked") return "blocked";
-    return "unknown";
-  }, [availability, lastChecked, loading]);
+  const [selectedDomain, setSelectedDomain] = useState<string>(state.domain || "");
 
+  // Reset selection when user searches new keyword
   useEffect(() => {
-    // Persist to order context when we have a definitive status
-    if (!status || status === "unknown") return;
-    if (status === "available" || status === "unavailable" || status === "premium") {
-      setDomainStatus(status);
-    } else {
-      setDomainStatus(null);
-    }
-  }, [setDomainStatus, status]);
+    setSelectedDomain("");
+    setDomainStatus(null);
+  }, [keyword, setDomainStatus]);
 
-  const canContinue = Boolean(lastChecked) && status === "available";
+  // Pricing depends on selected domain
+  const { pricing } = useOrderPublicSettings(selectedDomain || lastChecked);
+
+  const canContinue = Boolean(selectedDomain);
 
   return (
     <OrderLayout title={t("order.step.domain")} step="domain" sidebar={<OrderSummaryCard showEstPrice={false} />}>
@@ -86,45 +89,74 @@ export default function ChooseDomain() {
                         <th className="px-3 py-2 text-left font-medium text-foreground">{t("order.table.domain")}</th>
                         <th className="px-3 py-2 text-left font-medium text-foreground">{t("order.table.status")}</th>
                         <th className="px-3 py-2 text-left font-medium text-foreground">{t("order.table.price")}</th>
+                        <th className="px-3 py-2 text-right font-medium text-foreground">&nbsp;</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className="border-t">
-                        <td className="px-3 py-2 font-medium text-foreground">{lastChecked}</td>
-                        <td className="px-3 py-2">
-                          <div className="flex items-center gap-2">
-                            <Badge variant={badgeVariant(status ?? "unknown")}>
-                              {status === "available"
-                                ? "Available"
-                                : status === "unavailable"
-                                  ? "Unavailable"
-                                  : status === "premium"
-                                    ? "Premium Domain"
-                                    : status === "blocked"
-                                      ? "Not Available"
-                                      : loading
-                                        ? "Checking…"
-                                        : "Unknown"}
-                            </Badge>
-                          </div>
-                        </td>
-                        <td className="px-3 py-2">
-                          {pricing.domainPriceUsd == null ? (
-                            <span className="text-muted-foreground">—</span>
-                          ) : (
-                            <div className="flex flex-col items-start">
-                              <span className="text-base font-semibold text-foreground">{formatUsd(pricing.domainPriceUsd)}</span>
-                              <span className="text-xs text-muted-foreground line-through">{formatUsd(pricing.domainPriceUsd * 1.25)}</span>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
+                      {loading ? (
+                        <tr className="border-t">
+                          <td className="px-3 py-3 text-muted-foreground" colSpan={4}>
+                            Checking…
+                          </td>
+                        </tr>
+                      ) : availableItems.length === 0 ? (
+                        <tr className="border-t">
+                          <td className="px-3 py-3 text-muted-foreground" colSpan={4}>
+                            Tidak ada domain available untuk keyword ini.
+                          </td>
+                        </tr>
+                      ) : (
+                        availableItems.map((it) => {
+                          const isSelected = selectedDomain === it.domain;
+                          return (
+                            <tr key={it.domain} className="border-t">
+                              <td className="px-3 py-2 font-medium text-foreground">{it.domain}</td>
+                              <td className="px-3 py-2">
+                                <Badge variant={badgeVariant("available")}>Available</Badge>
+                              </td>
+                              <td className="px-3 py-2">
+                                {it.price_usd == null ? (
+                                  <span className="text-muted-foreground">—</span>
+                                ) : (
+                                  <div className="flex flex-col items-start">
+                                    <span className="text-base font-semibold text-foreground">{formatUsd(it.price_usd)}</span>
+                                    <span className="text-xs text-muted-foreground line-through">{formatUsd(it.price_usd * 1.25)}</span>
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                <Button
+                                  type="button"
+                                  variant={isSelected ? "secondary" : "outline"}
+                                  onClick={() => {
+                                    setSelectedDomain(it.domain);
+                                    setDomain(it.domain);
+                                    setDomainStatus("available");
+                                  }}
+                                >
+                                  {isSelected ? "Dipilih" : "Pilih"}
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                   </table>
                 </div>
 
                 {error ? <p className="text-sm text-destructive">{error}</p> : null}
-                <p className="text-xs text-muted-foreground">Powered by DomainDuck API. (WHOIS & RDAP tidak ditampilkan di Find Domain)</p>
+
+                <div className="flex items-start justify-between gap-4">
+                  <p className="text-xs text-muted-foreground">Powered by Domainr API. (Hanya domain yang available ditampilkan)</p>
+
+                  {pricing.domainPriceUsd == null || !selectedDomain ? null : (
+                    <div className="text-right">
+                      <div className="text-sm text-muted-foreground">Estimasi harga domain terpilih</div>
+                      <div className="text-base font-semibold text-foreground">{formatUsd(pricing.domainPriceUsd)}</div>
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </CardContent>
@@ -136,9 +168,7 @@ export default function ChooseDomain() {
             size="lg"
             disabled={!canContinue}
             onClick={() => {
-              if (lastChecked) {
-                setDomain(lastChecked);
-              }
+              if (selectedDomain) setDomain(selectedDomain);
               navigate("/order/choose-design");
             }}
           >
@@ -149,4 +179,3 @@ export default function ChooseDomain() {
     </OrderLayout>
   );
 }
-

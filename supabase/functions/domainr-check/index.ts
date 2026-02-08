@@ -44,15 +44,7 @@ function stripTld(domainOrLabel: string) {
 function buildCandidates(base: string, tlds: string[]) {
   const name = stripTld(base);
   if (!name) return [];
-  const variants = [name, `${name}hq`, `get${name}`, `${name}app`];
-  const out: string[] = [];
-  for (const v of variants) {
-    for (const t of tlds) {
-      out.push(`${v}${t}`);
-      if (out.length >= 12) return out;
-    }
-  }
-  return out;
+  return tlds.map((t) => `${name}${t}`).slice(0, 10);
 }
 
 function summarizeToUiStatus(summary?: string, status?: string) {
@@ -64,13 +56,21 @@ function summarizeToUiStatus(summary?: string, status?: string) {
   return "unknown" as const;
 }
 
-const POPULAR_TLDS = [".com", ".net", ".co", ".id", ".org"]; // per user request: multi TLD populer
+// Per request: tampilkan TLD favorit (maks 10) untuk keyword yang sama
+const FAVORITE_TLDS = [".com", ".id", ".my.id", ".biz.id", ".co.id", ".web.id", ".net", ".org", ".online", ".store"];
+
+// Pricing fallback (optional). Jika belum ada, tampilkan "—" di UI.
 const DEFAULT_PRICES_USD: Record<string, number> = {
   ".com": 14.99,
   ".net": 16.99,
-  ".co": 32.99,
-  ".id": 19.99,
   ".org": 12.99,
+  ".id": 19.99,
+  ".online": 29.99,
+  ".store": 39.99,
+  ".my.id": 9.99,
+  ".biz.id": 9.99,
+  ".co.id": 24.99,
+  ".web.id": 9.99,
 };
 
 async function getDomainrApiKey(admin: any) {
@@ -176,23 +176,26 @@ Deno.serve(async (req) => {
       });
     }
 
-    const candidates = buildCandidates(query, POPULAR_TLDS);
+    const candidates = buildCandidates(query, FAVORITE_TLDS);
     const statusRows = await domainrStatus(candidates, apiKey);
     const byDomain = new Map(statusRows.map((r) => [String(r.domain).toLowerCase(), r]));
 
-    const items = candidates.map((d) => {
-      const r = byDomain.get(d.toLowerCase());
-      const uiStatus = summarizeToUiStatus(r?.summary, r?.status);
-      const tld = `.${d.split(".").pop() ?? ""}`;
-      const priceUsd = uiStatus === "available" ? DEFAULT_PRICES_USD[tld] ?? null : null;
-      return {
-        domain: d,
-        status: uiStatus,
-        price_usd: priceUsd,
-        currency: priceUsd ? "USD" : null,
-        raw: r ? { summary: r.summary ?? null, status: r.status ?? null } : null,
-      };
-    });
+    const items = candidates
+      .map((d) => {
+        const r = byDomain.get(d.toLowerCase());
+        const uiStatus = summarizeToUiStatus(r?.summary, r?.status);
+        const tld = `.${d.split(".").pop() ?? ""}`;
+        const priceUsd = uiStatus === "available" ? DEFAULT_PRICES_USD[tld] ?? null : null;
+        return {
+          domain: d,
+          status: uiStatus,
+          price_usd: priceUsd,
+          currency: priceUsd ? "USD" : null,
+          raw: r ? { summary: r.summary ?? null, status: r.status ?? null } : null,
+        };
+      })
+      .filter((it) => it.status === "available")
+      .slice(0, 10);
 
     return new Response(JSON.stringify({ items }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
