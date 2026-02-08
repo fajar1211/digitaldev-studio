@@ -69,32 +69,50 @@ export default function Packages() {
     description: t("packages.seoDesc"),
   });
 
+  type PackagesCardsAlign = "left" | "center" | "right";
+  const LAYOUT_SETTINGS_KEY = "packages_layout";
+
+  const [cardsAlign, setCardsAlign] = useState<PackagesCardsAlign>("center");
   const [faqs, setFaqs] = useState<FaqRow[]>([]);
   const [packages, setPackages] = useState<PublicPackageRow[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const justifyClass =
+    cardsAlign === "left" ? "justify-start" : cardsAlign === "right" ? "justify-end" : "justify-center";
+
   useEffect(() => {
     (async () => {
-      // Fetch FAQs
-      const { data, error } = await supabase
-        .from("website_faqs")
-        .select("id,page,question,answer,sort_order,is_published,created_at,updated_at")
-        .eq("page", "packages")
-        .eq("is_published", true)
-        .order("sort_order", { ascending: true })
-        .order("created_at", { ascending: true });
+      const [faqRes, pkgRes, layoutRes] = await Promise.all([
+        supabase
+          .from("website_faqs")
+          .select("id,page,question,answer,sort_order,is_published,created_at,updated_at")
+          .eq("page", "packages")
+          .eq("is_published", true)
+          .order("sort_order", { ascending: true })
+          .order("created_at", { ascending: true }),
+        supabase
+          .from("packages")
+          .select("*")
+          .eq("is_active", true)
+          .eq("show_on_public", true)
+          .order("created_at", { ascending: true }),
+        (supabase as any)
+          .from("website_settings")
+          .select("value")
+          .eq("key", LAYOUT_SETTINGS_KEY)
+          .maybeSingle(),
+      ]);
 
-      if (!error) setFaqs((data ?? []) as FaqRow[]);
+      if (!faqRes.error) setFaqs((faqRes.data ?? []) as FaqRow[]);
 
-      // Fetch public packages
-      const { data: pkgData } = await supabase
-        .from("packages")
-        .select("*")
-        .eq("is_active", true)
-        .eq("show_on_public", true)
-        .order("created_at", { ascending: true });
+      if (pkgRes.data) setPackages((pkgRes.data as PublicPackageRow[]).slice().sort(sortPackagesForPublic));
 
-      if (pkgData) setPackages((pkgData as PublicPackageRow[]).slice().sort(sortPackagesForPublic));
+      const raw = layoutRes?.data?.value as any;
+      const nextAlign = raw?.cardsAlign;
+      if (nextAlign === "left" || nextAlign === "center" || nextAlign === "right") {
+        setCardsAlign(nextAlign);
+      }
+
       setLoading(false);
     })();
   }, []);
@@ -131,7 +149,7 @@ export default function Packages() {
             <p className="text-center text-muted-foreground">{t("packages.empty")}</p>
           ) : (
             <div className="mx-auto max-w-6xl">
-              <div className="flex flex-wrap justify-center gap-8">
+              <div className={`flex flex-wrap gap-8 ${justifyClass}`}>
                 {packages.map((pkg, i) => {
                   const features = Array.isArray(pkg.features) ? pkg.features : [];
                   return (

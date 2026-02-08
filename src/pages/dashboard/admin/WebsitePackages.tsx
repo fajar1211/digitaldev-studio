@@ -4,6 +4,14 @@ import { Check, Eye, EyeOff, RefreshCcw, Save, Star, StarOff, X } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -30,6 +38,19 @@ const PUBLIC_PACKAGE_NAME_ORDER = [
   "custom",
 ] as const;
 
+type PackagesCardsAlign = "left" | "center" | "right";
+const LAYOUT_SETTINGS_KEY = "packages_layout";
+
+const ALIGN_OPTIONS: Array<{ value: PackagesCardsAlign; label: string }> = [
+  { value: "left", label: "Kiri" },
+  { value: "center", label: "Tengah" },
+  { value: "right", label: "Kanan" },
+];
+
+function sanitizeAlign(value: unknown): PackagesCardsAlign {
+  return value === "left" || value === "right" || value === "center" ? value : "center";
+}
+
 function sortPackagesForPublic(p1: PackageRow, p2: PackageRow) {
   const a = (p1.name ?? "").trim().toLowerCase();
   const b = (p2.name ?? "").trim().toLowerCase();
@@ -48,6 +69,9 @@ export default function WebsitePackages() {
   const [packages, setPackages] = useState<PackageRow[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+
+  const [cardsAlign, setCardsAlign] = useState<PackagesCardsAlign>("center");
+  const [baselineCardsAlign, setBaselineCardsAlign] = useState<PackagesCardsAlign>("center");
 
   const fetchPackages = async () => {
     setLoading(true);
@@ -68,8 +92,31 @@ export default function WebsitePackages() {
     }
   };
 
+  const fetchLayoutSettings = async () => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from("website_settings")
+        .select("value")
+        .eq("key", LAYOUT_SETTINGS_KEY)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      const raw = data?.value as any;
+      const nextAlign = sanitizeAlign(raw?.cardsAlign);
+      setCardsAlign(nextAlign);
+      setBaselineCardsAlign(nextAlign);
+    } catch (err) {
+      // Jika belum ada settings, default ke center.
+      setCardsAlign("center");
+      setBaselineCardsAlign("center");
+    }
+  };
+
   useEffect(() => {
-    fetchPackages();
+    (async () => {
+      await Promise.all([fetchPackages(), fetchLayoutSettings()]);
+    })();
   }, []);
 
   const toggleShowOnPublic = (id: string) => {
@@ -82,6 +129,12 @@ export default function WebsitePackages() {
     setPackages((prev) =>
       prev.map((pkg) => (pkg.id === id ? { ...pkg, is_recommended: !pkg.is_recommended } : pkg))
     );
+  };
+
+  const cancelEdit = async () => {
+    setIsEditing(false);
+    setCardsAlign(baselineCardsAlign);
+    await fetchPackages();
   };
 
   const finishEdit = async () => {
@@ -105,8 +158,14 @@ export default function WebsitePackages() {
       const firstError = results.find((r) => r.error)?.error;
       if (firstError) throw firstError;
 
-      toast.success("Public visibility updated successfully");
+      const { error: layoutErr } = await (supabase as any)
+        .from("website_settings")
+        .upsert({ key: LAYOUT_SETTINGS_KEY, value: { cardsAlign } }, { onConflict: "key" });
+      if (layoutErr) throw layoutErr;
+
+      toast.success("Public packages updated successfully");
       setLastSavedAt(new Date());
+      setBaselineCardsAlign(cardsAlign);
       await fetchPackages();
       setIsEditing(false);
     } catch (err) {
@@ -150,7 +209,12 @@ export default function WebsitePackages() {
 
           {isEditing ? (
             <>
-              <Button size="sm" variant="ghost" onClick={() => { setIsEditing(false); fetchPackages(); }} disabled={saving}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={cancelEdit}
+                disabled={saving}
+              >
                 <X className="h-4 w-4 mr-2" /> Cancel
               </Button>
               <Button size="sm" onClick={finishEdit} disabled={!canSave}>
@@ -164,6 +228,31 @@ export default function WebsitePackages() {
           )}
         </div>
       </header>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Tampilan /packages</CardTitle>
+          <CardDescription>Atur posisi kartu paket di halaman publik.</CardDescription>
+        </CardHeader>
+        <CardContent className="max-w-md">
+          <div className="grid gap-2">
+            <Label>Posisi paket</Label>
+            <Select value={cardsAlign} onValueChange={(v) => setCardsAlign(v as PackagesCardsAlign)} disabled={!canSave}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pilih posisi" />
+              </SelectTrigger>
+              <SelectContent>
+                {ALIGN_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Kiri = rata kiri, Tengah = default, Kanan = rata kanan.</p>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -208,9 +297,7 @@ export default function WebsitePackages() {
                     <TableRow key={pkg.id}>
                       <TableCell className="font-medium">{pkg.name}</TableCell>
                       <TableCell className="capitalize">{pkg.type}</TableCell>
-                      <TableCell>
-                        {pkg.price != null ? `$${Number(pkg.price).toFixed(2)}` : "—"}
-                      </TableCell>
+                      <TableCell>{pkg.price != null ? `$${Number(pkg.price).toFixed(2)}` : "—"}</TableCell>
                       <TableCell>
                         {pkg.is_active ? (
                           <Badge variant="default" className="gap-1">
