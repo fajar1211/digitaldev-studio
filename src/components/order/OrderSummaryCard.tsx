@@ -1,32 +1,16 @@
-import { useMemo } from "react";
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useOrder } from "@/contexts/OrderContext";
 import { useOrderPublicSettings } from "@/hooks/useOrderPublicSettings";
 import { useOrderAddOns } from "@/hooks/useOrderAddOns";
-import { usePackageDurations } from "@/hooks/usePackageDurations";
-import { computeDiscountedTotal } from "@/lib/packageDurations";
 import { useI18n } from "@/hooks/useI18n";
 
 export function OrderSummaryCard({ showEstPrice = true }: { showEstPrice?: boolean }) {
   const { t, lang } = useI18n();
   const { state } = useOrder();
-  const { pricing, contact, subscriptionPlans } = useOrderPublicSettings(state.domain, state.selectedPackageId);
-  const { rows: durationRows } = usePackageDurations(state.selectedPackageId);
+  const { contact, subscriptionPlans } = useOrderPublicSettings(state.domain, state.selectedPackageId);
   const { total: addOnsTotal } = useOrderAddOns({ packageId: state.selectedPackageId, quantities: state.addOns ?? {} });
-
-  const discountByMonths = useMemo(() => {
-    const m = new Map<number, number>();
-    for (const r of durationRows || []) {
-      if (r?.is_active === false) continue;
-      const months = Number((r as any).duration_months ?? 0);
-      const discount = Number((r as any).discount_percent ?? 0);
-      if (Number.isFinite(months) && months > 0) m.set(months, discount);
-    }
-    return m;
-  }, [durationRows]);
 
   const formatIdr = (value: number) => {
     return `Rp ${Math.round(value).toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;
@@ -65,29 +49,9 @@ export function OrderSummaryCard({ showEstPrice = true }: { showEstPrice?: boole
     if (!showEstPrice) return null;
     if (!state.subscriptionYears) return null;
 
-    const months = Number(state.subscriptionYears) * 12;
-    const discountPercent = discountByMonths.get(months) ?? 0;
-
-    // Align with SubscriptionPlan page:
-    // - treat missing domain/package price as 0 (so the summary matches what the user sees)
-    // - still return null when we truly have no meaningful base price
-    const baseAnnualIdr = Number(pricing.domainPriceUsd ?? 0) + Number(pricing.packagePriceUsd ?? 0);
-    if (!Number.isFinite(baseAnnualIdr) || baseAnnualIdr <= 0) return null;
-
-    // Prefer Duration & Discount config (package_durations).
-    if (discountByMonths.size > 0) {
-      const monthly = baseAnnualIdr / 12;
-      return computeDiscountedTotal({ monthlyPrice: monthly, months, discountPercent });
-    }
-
-    // Fallback to legacy website_settings.order_subscription_plans price override.
-    const selectedPlan = subscriptionPlans.find((p) => p.years === state.subscriptionYears);
-    const planOverrideIdr =
-      typeof selectedPlan?.price_usd === "number" && Number.isFinite(selectedPlan.price_usd) ? selectedPlan.price_usd : null;
-    if (planOverrideIdr != null) return planOverrideIdr;
-
-    // Final fallback: base annual x years.
-    return baseAnnualIdr * state.subscriptionYears;
+    const selectedPlan = (subscriptionPlans || []).find((p: any) => Number(p?.years) === Number(state.subscriptionYears));
+    const v = Number((selectedPlan as any)?.price_usd ?? 0);
+    return Number.isFinite(v) && v > 0 ? v : null;
   })();
 
   const baseTotalUsd = (() => {
