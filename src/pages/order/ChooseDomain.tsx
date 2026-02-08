@@ -17,11 +17,15 @@ function badgeVariant(_status: DomainStatus) {
   return "secondary" as const;
 }
 
-function formatUsd(value: number) {
+function formatIdr(value: number) {
   try {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      maximumFractionDigits: 0,
+    }).format(value);
   } catch {
-    return `$${value.toFixed(2)}`;
+    return `Rp ${Math.round(value).toLocaleString("id-ID")}`;
   }
 }
 
@@ -108,7 +112,8 @@ export default function ChooseDomain() {
             {!lastChecked ? (
               <p className="text-sm text-muted-foreground">{t("order.searchToCheck")}</p>
             ) : (
-              <>
+              <> 
+                <p className="text-xs text-muted-foreground">Hasil untuk: <span className="font-medium text-foreground">{lastChecked}</span></p>
                 <div className="overflow-hidden rounded-lg border">
                   <table className="w-full text-sm">
                     <thead className="bg-muted/40">
@@ -161,8 +166,8 @@ export default function ChooseDomain() {
                                   <span className="text-muted-foreground">—</span>
                                 ) : (
                                   <div className="flex flex-col items-start">
-                                    <span className="text-base font-semibold text-foreground">{formatUsd(rowPriceUsd)}</span>
-                                    <span className="text-xs text-muted-foreground line-through">{formatUsd(rowPriceUsd * 1.25)}</span>
+                                    <span className="text-base font-semibold text-foreground">{formatIdr(rowPriceUsd)}</span>
+                                    <span className="text-xs text-muted-foreground line-through">{formatIdr(rowPriceUsd * 1.25)}</span>
                                   </div>
                                 )}
                               </td>
@@ -204,7 +209,7 @@ export default function ChooseDomain() {
                   {selectedPriceUsd == null || !selectedDomain ? null : (
                     <div className="text-right">
                       <div className="text-sm text-muted-foreground">Estimasi harga domain terpilih</div>
-                      <div className="text-base font-semibold text-foreground">{formatUsd(selectedPriceUsd)}</div>
+                      <div className="text-base font-semibold text-foreground">{formatIdr(selectedPriceUsd)}</div>
                     </div>
                   )}
                 </div>
