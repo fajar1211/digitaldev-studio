@@ -165,6 +165,9 @@ export default function WebsitePackages() {
   };
 
   const movePackage = (id: string, dir: "up" | "down") => {
+    // Biar tombol urutan selalu aktif: saat diklik, otomatis masuk mode edit.
+    setIsEditing(true);
+
     setPackages((prev) => {
       const idx = prev.findIndex((p) => p.id === id);
       if (idx === -1) return prev;
@@ -352,7 +355,7 @@ export default function WebsitePackages() {
                             variant="ghost"
                             size="sm"
                             onClick={() => movePackage(pkg.id, "up")}
-                            disabled={!isEditing || saving || index === 0}
+                            disabled={loading || saving || index === 0}
                           >
                             <ArrowUp className="h-4 w-4" />
                           </Button>
@@ -361,7 +364,7 @@ export default function WebsitePackages() {
                             variant="ghost"
                             size="sm"
                             onClick={() => movePackage(pkg.id, "down")}
-                            disabled={!isEditing || saving || index === packages.length - 1}
+                            disabled={loading || saving || index === packages.length - 1}
                           >
                             <ArrowDown className="h-4 w-4" />
                           </Button>
