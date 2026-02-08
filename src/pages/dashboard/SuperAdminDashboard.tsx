@@ -52,7 +52,7 @@ export default function SuperAdminDashboard() {
       { title: "Users & Assists", url: "/dashboard/super-admin/users-assists", icon: Users },
       { title: "Admin Management", url: "/dashboard/super-admin/admin-management", icon: Shield },
       { title: "Access Control", url: "/dashboard/super-admin/access-control", icon: Bell },
-      { title: "Services / Packages", url: "/dashboard/super-admin/packages", icon: Package },
+      { title: "Marketing Packages", url: "/dashboard/super-admin/marketing-packages", icon: Package },
       { title: "Payments", url: "/dashboard/super-admin/payments", icon: CreditCard },
       { title: "Website Packages", url: "/dashboard/super-admin/website-packages", icon: Activity },
       { title: "Promotions", url: "/dashboard/super-admin/promotions", icon: BadgePercent },
@@ -136,8 +136,11 @@ export default function SuperAdminDashboard() {
                 path="users-assists"
                 element={<SuperAdminUsersAssists />}
               />
-              <Route path="packages" element={<SuperAdminPackages />} />
-              <Route path="packages/:id" element={<SuperAdminPackageEdit />} />
+              <Route path="marketing-packages" element={<SuperAdminPackages />} />
+              <Route path="marketing-packages/:id" element={<SuperAdminPackageEdit />} />
+              {/* Backward compatible redirect */}
+              <Route path="packages" element={<Navigate to="/dashboard/super-admin/marketing-packages" replace />} />
+              <Route path="packages/:id" element={<Navigate to="/dashboard/super-admin/marketing-packages" replace />} />
               <Route path="payments" element={<SuperAdminPayments />} />
               <Route path="website-packages" element={<SuperAdminSubscriptions />} />
               {/* Backward compatible redirect */}

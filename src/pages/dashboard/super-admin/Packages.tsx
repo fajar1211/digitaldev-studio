@@ -95,7 +95,7 @@ export default function SuperAdminPackages() {
     is_recommended: false,
   });
 
-  const title = "Services / Packages";
+  const title = "Marketing Packages";
 
   const fetchPackages = async () => {
     setLoading(true);
@@ -198,7 +198,7 @@ export default function SuperAdminPackages() {
       resetDraft();
       await fetchPackages();
 
-      if (data?.id) navigate(`/dashboard/super-admin/packages/${String(data.id)}`);
+      if (data?.id) navigate(`/dashboard/super-admin/marketing-packages/${String(data.id)}`);
     } catch (err: any) {
       console.error("Error creating package:", err);
       toast.error(err?.message || "Failed to create package");
@@ -378,7 +378,7 @@ export default function SuperAdminPackages() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => navigate(`/dashboard/super-admin/packages/${pkg.id}`)}
+                          onClick={() => navigate(`/dashboard/super-admin/marketing-packages/${pkg.id}`)}
                         >
                           <Edit className="h-4 w-4" />
                           <span className="sr-only">Edit</span>

@@ -361,10 +361,10 @@ export default function SuperAdminSubscriptions() {
       <h1 className="text-3xl font-bold text-foreground">Website Packages</h1>
 
       <Tabs defaultValue="subscription" className="w-full">
-        <TabsList className="w-full justify-center overflow-x-auto">
+        <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="subscription">Plans</TabsTrigger>
-          <TabsTrigger value="domain">Domain</TabsTrigger>
           <TabsTrigger value="add-ons">Add-ons</TabsTrigger>
+          <TabsTrigger value="domain">Domain</TabsTrigger>
         </TabsList>
 
         <TabsContent value="subscription">

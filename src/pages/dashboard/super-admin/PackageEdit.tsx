@@ -60,7 +60,7 @@ export default function SuperAdminPackageEdit() {
 
   useEffect(() => {
     if (!id) {
-      navigate("/dashboard/super-admin/packages", { replace: true });
+      navigate("/dashboard/super-admin/marketing-packages", { replace: true });
       return;
     }
 
@@ -76,7 +76,7 @@ export default function SuperAdminPackageEdit() {
         if (error) throw error;
         if (!data) {
           toast.error("Package tidak ditemukan");
-          navigate("/dashboard/super-admin/packages", { replace: true });
+          navigate("/dashboard/super-admin/marketing-packages", { replace: true });
           return;
         }
 
@@ -291,7 +291,7 @@ export default function SuperAdminPackageEdit() {
       }
 
       toast.success("Package berhasil disimpan");
-      navigate("/dashboard/super-admin/packages");
+      navigate("/dashboard/super-admin/marketing-packages");
     } catch (err: any) {
       console.error("Error saving package:", err);
       toast.error(err?.message || "Gagal menyimpan package");
@@ -305,13 +305,13 @@ export default function SuperAdminPackageEdit() {
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/dashboard/super-admin/packages")}
-              aria-label="Back"
-              title="Back"
-            >
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate("/dashboard/super-admin/marketing-packages")}
+                aria-label="Back"
+                title="Back"
+              >
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <h1 className="text-3xl font-bold text-foreground">Edit Package</h1>
@@ -505,7 +505,7 @@ export default function SuperAdminPackageEdit() {
                   className="flex-1"
                   type="button"
                   variant="outline"
-                  onClick={() => navigate("/dashboard/super-admin/packages")}
+                  onClick={() => navigate("/dashboard/super-admin/marketing-packages")}
                   disabled={saving}
                 >
                   Cancel
