@@ -133,6 +133,11 @@ export const dict: Dict = {
   "order.priceBreakdown": { id: "Rincian harga", en: "Price breakdown" },
   "order.amount": { id: "Total", en: "Amount" },
   "order.reviewNote": { id: "Silakan cek domain, desain, dan detail kamu di Ringkasan Order.", en: "Please review your domain, chosen design, and details in the Order Summary." },
+  "order.completeOrderTitle": { id: "Lengkapi order dulu", en: "Please complete your order" },
+  "order.completeOrderBody": {
+    id: "Lengkapi domain, pilih template, isi email, dan setujui syarat sebelum bayar.",
+    en: "Complete domain, select a template, enter your email, and accept terms before paying.",
+  },
   "order.pay": { id: "Bayar", en: "Pay" },
   "order.confirmPayment": { id: "Konfirmasi pembayaran", en: "Confirm payment" },
   "order.processing": { id: "Memproses...", en: "Processing..." },

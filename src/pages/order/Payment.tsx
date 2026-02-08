@@ -640,7 +640,6 @@ export default function Payment() {
               confirming={paying}
               disabled={
                 gateway == null ||
-                !canComplete ||
                 paying ||
                 totalAfterPromoUsd == null ||
                 (gateway === "midtrans" ? !midtrans.ready || !isCardFormValid : false)
@@ -649,7 +648,15 @@ export default function Payment() {
               triggerText={gateway === "xendit" ? t("order.payWithXendit") : t("order.payWithCard")}
               confirmText={gateway === "xendit" ? t("order.confirmContinue") : t("order.confirmAndPay")}
               note={gateway === "xendit" ? t("order.redirectXendit") : t("order.midtransIdrNote")}
-              onConfirm={gateway === "xendit" ? startXenditInvoice : startCardPayment}
+              onConfirm={async () => {
+                if (!canComplete) {
+                  toast({ variant: "destructive", title: t("order.completeOrderTitle"), description: t("order.completeOrderBody") });
+                  setConfirmOpen(false);
+                  return;
+                }
+                if (gateway === "xendit") return await startXenditInvoice();
+                return await startCardPayment();
+              }}
             />
           ) : null}
         </div>
