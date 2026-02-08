@@ -3,15 +3,12 @@ import { useNavigate } from "react-router-dom";
 
 import { OrderLayout } from "@/components/order/OrderLayout";
 import { OrderSummaryCard } from "@/components/order/OrderSummaryCard";
-import { OrderWebsitePackagesCards } from "@/components/order/OrderWebsitePackagesCards";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { computeDiscountedTotal } from "@/lib/packageDurations";
 import { useOrder } from "@/contexts/OrderContext";
 import { useOrderPublicSettings } from "@/hooks/useOrderPublicSettings";
-import { usePackageDurations } from "@/hooks/usePackageDurations";
 import { useI18n } from "@/hooks/useI18n";
 
 function formatIdr(value: number) {
@@ -22,55 +19,30 @@ export default function SubscriptionPlan() {
   const navigate = useNavigate();
   const { t } = useI18n();
   const { state, setSubscriptionYears } = useOrder();
-  const { pricing, subscriptionPlans } = useOrderPublicSettings(state.domain, state.selectedPackageId);
-  const { rows: durationRows } = usePackageDurations(state.selectedPackageId);
-
-  const discountByMonths = useMemo(() => {
-    const m = new Map<number, number>();
-    for (const r of durationRows || []) {
-      if (r?.is_active === false) continue;
-      const months = Number((r as any).duration_months ?? 0);
-      const discount = Number((r as any).discount_percent ?? 0);
-      if (Number.isFinite(months) && months > 0) m.set(months, discount);
-    }
-    return m;
-  }, [durationRows]);
-
-  const baseAnnualIdr = useMemo(() => {
-    const domain = pricing.domainPriceUsd ?? 0;
-    const pkg = pricing.packagePriceUsd ?? 0;
-    return domain + pkg;
-  }, [pricing.domainPriceUsd, pricing.packagePriceUsd]);
-
-  const monthlyPriceIdr = useMemo(() => {
-    if (!Number.isFinite(baseAnnualIdr) || baseAnnualIdr <= 0) return 0;
-    return baseAnnualIdr / 12;
-  }, [baseAnnualIdr]);
-
-  const packagePriceIdr = useMemo(() => {
-    const v = Number(pricing.packagePriceUsd ?? 0);
-    return Number.isFinite(v) ? v : 0;
-  }, [pricing.packagePriceUsd]);
+  const { subscriptionPlans } = useOrderPublicSettings(state.domain, state.selectedPackageId);
 
   const options = useMemo(
     () =>
-      subscriptionPlans.map((p) => {
-        const months = Number(p.years) * 12;
-        const discountPercent = discountByMonths.get(months) ?? 0;
-        const totalIdr =
-          monthlyPriceIdr > 0
-            ? computeDiscountedTotal({ monthlyPrice: monthlyPriceIdr, months, discountPercent })
-            : null;
+      (subscriptionPlans || [])
+        .map((p: any) => {
+          const years = Number(p?.years ?? 0);
+          const label = String(p?.label ?? "").trim();
+          const priceIdr = Number(p?.price_usd ?? 0);
+          const isActive = p?.is_active !== false;
+          const sortOrderRaw = (p as any)?.sort_order;
+          const sortOrder = Number.isFinite(Number(sortOrderRaw)) ? Number(sortOrderRaw) : years || 0;
 
-        return {
-          years: p.years,
-          label: p.label,
-          months,
-          discountPercent,
-          totalIdr,
-        };
-      }),
-    [discountByMonths, monthlyPriceIdr, subscriptionPlans],
+          return {
+            years,
+            label,
+            priceIdr,
+            isActive,
+            sortOrder,
+          };
+        })
+        .filter((opt) => opt.years > 0 && opt.isActive)
+        .sort((a, b) => a.sortOrder - b.sortOrder),
+    [subscriptionPlans],
   );
 
   const selected = state.subscriptionYears;
@@ -78,38 +50,31 @@ export default function SubscriptionPlan() {
   return (
     <OrderLayout title={t("order.step.plan")} step="plan" sidebar={<OrderSummaryCard />}>
       <div className="space-y-6">
-        <OrderWebsitePackagesCards />
-
         <div id="order-duration" />
 
-        {state.selectedPackageId ? (
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <CardTitle className="text-base">{t("order.chooseDuration")}</CardTitle>
-                    {state.selectedPackageName ? (
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Paket terpilih: <span className="text-foreground font-medium">{state.selectedPackageName}</span>
-                      </p>
-                    ) : null}
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => document.getElementById("order-packages")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                  >
-                    Ganti paket
-                  </Button>
-                </div>
-              </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">{t("order.includesCosts")}</p>
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <CardTitle className="text-base">{t("order.chooseDuration")}</CardTitle>
+                {state.selectedPackageName ? (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Paket terpilih: <span className="text-foreground font-medium">{state.selectedPackageName}</span>
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">{t("order.includesCosts")}</p>
 
+            {options.length ? (
               <div className="grid gap-3 sm:grid-cols-3">
                 {options.map((opt) => {
                   const isSelected = selected === opt.years;
+                  const raw = (opt.label ?? "").trim();
+                  const finalLabel = raw || `Durasi ${opt.years} Tahun`;
+
                   return (
                     <button
                       key={opt.years}
@@ -122,26 +87,8 @@ export default function SubscriptionPlan() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          {(() => {
-                            const raw = (opt.label ?? "").trim();
-                            const normalized = raw
-                              ? raw.replace(/^paket\s*/i, "Durasi ").replace(/tahun/i, "Tahun")
-                              : `Durasi ${opt.years} Tahun`;
-                            const finalLabel = normalized || `Durasi ${opt.years} Tahun`;
-
-                            return (
-                              <>
-                                <p className="text-base font-semibold text-foreground">{finalLabel}</p>
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                  {t("order.allIn")}
-                                  {opt.discountPercent > 0 ? ` • Diskon ${Math.round(opt.discountPercent)}%` : ""}
-                                </p>
-                                {packagePriceIdr > 0 ? (
-                                  <p className="mt-1 text-xs text-muted-foreground">Paket: {formatIdr(packagePriceIdr)}</p>
-                                ) : null}
-                              </>
-                            );
-                          })()}
+                          <p className="text-base font-semibold text-foreground">{finalLabel}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">{t("order.allIn")}</p>
                         </div>
                         {isSelected ? (
                           <Badge variant="secondary">{t("order.selected")}</Badge>
@@ -151,24 +98,20 @@ export default function SubscriptionPlan() {
                       </div>
 
                       <div className="mt-4">
-                        <p className="text-2xl font-bold text-foreground">{opt.totalIdr == null ? "—" : formatIdr(opt.totalIdr)}</p>
+                        <p className="text-2xl font-bold text-foreground">
+                          {opt.priceIdr > 0 ? formatIdr(opt.priceIdr) : "—"}
+                        </p>
                         <p className="mt-1 text-xs text-muted-foreground">{t("order.totalFor", { years: opt.years })}</p>
                       </div>
                     </button>
                   );
                 })}
               </div>
-
-              {pricing.packagePriceUsd == null ? <p className="text-xs text-muted-foreground">{t("order.noteDefaultPackage")}</p> : null}
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardContent className="py-6">
-              <p className="text-sm text-muted-foreground">Silakan pilih paket terlebih dulu untuk melihat pilihan durasi.</p>
-            </CardContent>
-          </Card>
-        )}
+            ) : (
+              <p className="text-sm text-muted-foreground">Belum ada rencana langganan yang tersedia.</p>
+            )}
+          </CardContent>
+        </Card>
 
         <div className="flex items-center justify-between gap-3">
           <Button type="button" variant="outline" onClick={() => navigate("/order/details")}>
@@ -177,7 +120,7 @@ export default function SubscriptionPlan() {
           <Button
             type="button"
             size="lg"
-            disabled={!state.selectedPackageId || !selected}
+            disabled={!selected}
             onClick={() => navigate("/order/payment")}
           >
             {t("order.continuePayment")}
