@@ -146,9 +146,18 @@ export const dict: Dict = {
   "order.paypalLoading": { id: "Memuat PayPal…", en: "Loading PayPal…" },
   "order.paypalNotReady": { id: "PayPal belum bisa dipakai. Pastikan domain, template, dan total sudah siap.", en: "PayPal can't be used yet. Make sure domain, template, and total are ready." },
   "order.paypalNotConfigured": { id: "Belum dikonfigurasi", en: "Not configured" },
+  "order.paymentFailedTitle": { id: "Pembayaran gagal", en: "Payment failed" },
+  "order.paymentCreatedTitle": { id: "Pembayaran dibuat", en: "Payment created" },
+  "order.totalNotAvailableTitle": { id: "Total belum tersedia", en: "Total not available" },
+  "order.midtransNotReadyTitle": { id: "Midtrans belum siap", en: "Midtrans is not ready" },
+  "order.pleaseWaitTryAgain": { id: "Tunggu sebentar lalu coba lagi.", en: "Please wait a moment and try again." },
+  "order.tryAgain": { id: "Silakan coba lagi.", en: "Please try again." },
 
-  // Generic buttons
+  // Generic
   "common.back": { id: "Kembali", en: "Back" },
+  "common.ready": { id: "Siap", en: "Ready" },
+  "common.off": { id: "Nonaktif", en: "Off" },
+  "common.hosted": { id: "Hosted", en: "Hosted" },
   "order.viewDetail": { id: "Lihat Detail", en: "View details" },
 
   // Services

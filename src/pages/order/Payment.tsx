@@ -11,12 +11,19 @@ import { useOrderPublicSettings } from "@/hooks/useOrderPublicSettings";
 import { useOrderAddOns } from "@/hooks/useOrderAddOns";
 import { validatePromoCode } from "@/hooks/useOrderPromoCode";
 import { useToast } from "@/hooks/use-toast";
+import { useI18n } from "@/hooks/useI18n";
 import { supabase } from "@/integrations/supabase/client";
 import { useMidtransOrderSettings } from "@/hooks/useMidtransOrderSettings";
 import { usePaypalOrderSettings } from "@/hooks/usePaypalOrderSettings";
 import { PayPalButtonsSection } from "@/components/order/PayPalButtonsSection";
 import { usePackageDurations } from "@/hooks/usePackageDurations";
 import { computeDiscountedTotal } from "@/lib/packageDurations";
+
+const USD_TO_IDR_RATE = 16000;
+
+function formatIdr(value: number) {
+  return `Rp ${Math.round(value).toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;
+}
 
 declare global {
   interface Window {
@@ -40,6 +47,7 @@ declare global {
 
 export default function Payment() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const { toast } = useToast();
   const { state, setPromoCode, setAppliedPromo } = useOrder();
   const { pricing, subscriptionPlans } = useOrderPublicSettings(state.domain, state.selectedPackageId);
@@ -191,16 +199,11 @@ export default function Payment() {
     return Math.max(0, baseTotalUsd - discount);
   }, [baseTotalUsd, state.appliedPromo?.discountUsd]);
 
-  const usdFormatter = useMemo(
-    () =>
-      new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }),
-    [],
-  );
+  const totalAfterPromoIdr = useMemo(() => {
+    if (totalAfterPromoUsd == null) return null;
+    return Math.max(0, Math.round(totalAfterPromoUsd * USD_TO_IDR_RATE));
+  }, [totalAfterPromoUsd]);
+
 
   // Auto-apply promo as user types (debounced), so Est. price updates immediately.
   useEffect(() => {
@@ -281,11 +284,11 @@ export default function Payment() {
   const startCardPayment = async () => {
     if (gateway !== "midtrans") return;
     if (!window.MidtransNew3ds?.getCardToken) {
-      toast({ variant: "destructive", title: "Midtrans script not ready", description: "Please wait a moment and try again." });
+      toast({ variant: "destructive", title: t("order.midtransNotReadyTitle"), description: t("order.pleaseWaitTryAgain") });
       return;
     }
     if (totalAfterPromoUsd == null) {
-      toast({ variant: "destructive", title: "Total not available" });
+      toast({ variant: "destructive", title: t("order.totalNotAvailableTitle") });
       return;
     }
 
@@ -341,12 +344,12 @@ export default function Payment() {
         return;
       }
 
-      toast({ title: "Payment created", description: `Order: ${data.order_id}` });
+      toast({ title: t("order.paymentCreatedTitle"), description: `Order: ${data.order_id}` });
     } catch (e: any) {
       toast({
         variant: "destructive",
-        title: "Payment failed",
-        description: e?.message ?? "Please try again.",
+        title: t("order.paymentFailedTitle"),
+        description: e?.message ?? t("order.tryAgain"),
       });
     } finally {
       setPaying(false);
@@ -356,7 +359,7 @@ export default function Payment() {
 
   const startXenditInvoice = async () => {
     if (totalAfterPromoUsd == null) {
-      toast({ variant: "destructive", title: "Total not available" });
+      toast({ variant: "destructive", title: t("order.totalNotAvailableTitle") });
       return;
     }
 
@@ -388,7 +391,7 @@ export default function Payment() {
       if (!url) throw new Error("Invoice URL not returned");
       window.location.href = url;
     } catch (e: any) {
-      toast({ variant: "destructive", title: "Payment failed", description: e?.message ?? "Please try again." });
+      toast({ variant: "destructive", title: t("order.paymentFailedTitle"), description: e?.message ?? t("order.tryAgain") });
     } finally {
       setPaying(false);
       setConfirmOpen(false);
@@ -397,38 +400,37 @@ export default function Payment() {
 
   if (gatewayLoading) {
     return (
-      <OrderLayout title="Payment" step="payment" sidebar={<OrderSummaryCard />}>
-        <div className="text-sm text-muted-foreground">Loading payment options…</div>
+      <OrderLayout title={t("order.step.payment")} step="payment" sidebar={<OrderSummaryCard />}>
+        <div className="text-sm text-muted-foreground">{t("order.loadingPayment")}</div>
       </OrderLayout>
     );
   }
 
   return (
-    <OrderLayout title="Payment" step="payment" sidebar={<OrderSummaryCard />}>
+    <OrderLayout title={t("order.step.payment")} step="payment" sidebar={<OrderSummaryCard />}>
       <div className="space-y-6">
         {gateway == null ? (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Payment gateway belum aktif</CardTitle>
+              <CardTitle className="text-base">{t("order.gatewayInactiveTitle")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-              <p className="text-muted-foreground">
-                Saat ini belum ada gateway pembayaran yang terkonfigurasi (Xendit/PayPal/Midtrans). Silakan aktifkan salah satu
-                gateway di dashboard Super Admin, lalu kembali ke halaman ini.
-              </p>
+              <p className="text-muted-foreground">{t("order.gatewayInactiveBody")}</p>
               {available ? (
                 <p className="text-muted-foreground">
-                  Status konfigurasi: Xendit {available.xendit ? "Ready" : "Off"} · PayPal {available.paypal ? "Ready" : "Off"} ·
-                  Midtrans {available.midtrans ? "Ready" : "Off"}
+                  {t("order.configStatus")}: Xendit {available.xendit ? t("common.ready") : t("common.off")} · PayPal{" "}
+                  {available.paypal ? t("common.ready") : t("common.off")} · Midtrans{" "}
+                  {available.midtrans ? t("common.ready") : t("common.off")}
                 </p>
               ) : null}
             </CardContent>
           </Card>
         ) : null}
 
+
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Payment method</CardTitle>
+            <CardTitle className="text-base">{t("order.paymentMethod")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {gateway === "xendit" ? (
@@ -440,7 +442,7 @@ export default function Payment() {
             ) : (
               <div className="flex gap-2">
                 <Button type="button" variant={method === "card" ? "default" : "outline"} onClick={() => setMethod("card")}>
-                  Card
+                  {t("order.card")}
                 </Button>
                 <Button
                   type="button"
@@ -451,7 +453,7 @@ export default function Payment() {
                   PayPal
                 </Button>
                 <Button type="button" variant={method === "bank" ? "default" : "outline"} onClick={() => setMethod("bank")}>
-                  Bank transfer
+                  {t("order.bankTransfer")}
                 </Button>
               </div>
             )}
@@ -463,7 +465,7 @@ export default function Payment() {
                     <p className="font-medium text-foreground">PayPal</p>
                     <p className="text-muted-foreground">Env: {paypal.env}</p>
                   </div>
-                  <span className="text-muted-foreground">{paypalButtonsEnabled ? "Ready" : "Not configured"}</span>
+                  <span className="text-muted-foreground">{paypalButtonsEnabled ? t("common.ready") : t("order.paypalNotConfigured")}</span>
                 </div>
 
                 {paypal.error ? <p className="text-sm text-muted-foreground">{paypal.error}</p> : null}
@@ -485,7 +487,7 @@ export default function Payment() {
                   onError={(msg) =>
                     toast({
                       variant: msg === "Canceled" ? "default" : "destructive",
-                      title: msg === "Canceled" ? "Canceled" : "Payment failed",
+                      title: msg === "Canceled" ? t("order.cancel") : t("order.paymentFailedTitle"),
                       description: msg === "Canceled" ? "" : msg,
                     })
                   }
@@ -506,7 +508,7 @@ export default function Payment() {
                     </p>
                     {gateway === "midtrans" ? <p className="text-muted-foreground">Env: {midtrans.env}</p> : null}
                   </div>
-                  <span className="text-muted-foreground">{gateway === "xendit" ? "Hosted" : midtrans.ready ? "Ready" : "Not configured"}</span>
+                  <span className="text-muted-foreground">{gateway === "xendit" ? t("common.hosted") : midtrans.ready ? t("common.ready") : t("order.paypalNotConfigured")}</span>
                 </div>
 
                 {gateway === "midtrans" ? (
@@ -515,7 +517,7 @@ export default function Payment() {
                       <Input
                         value={cardNumber}
                         onChange={(e) => setCardNumber(e.target.value)}
-                        placeholder="Card number"
+                        placeholder={t("order.cardNumber")}
                         inputMode="numeric"
                         autoComplete="cc-number"
                       />
@@ -560,7 +562,7 @@ export default function Payment() {
             )}
 
             <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-              <Input value={promo} onChange={(e) => setPromo(e.target.value)} placeholder="Promo code" />
+              <Input value={promo} onChange={(e) => setPromo(e.target.value)} placeholder={t("order.promoCode")} />
               <Button
                 type="button"
                 variant="outline"
@@ -569,19 +571,19 @@ export default function Payment() {
                   setPromoCode(code);
                   if (!code) {
                     setAppliedPromo(null);
-                    toast({ title: "Promo cleared" });
+                    toast({ title: t("order.promoCleared") });
                     return;
                   }
                   if (baseTotalUsd == null) {
                     setAppliedPromo(null);
-                      toast({ variant: "destructive", title: "Unable to apply promo", description: "The total amount is not available yet." });
+                    toast({ variant: "destructive", title: t("order.unableApplyPromo"), description: t("order.totalNotAvailableYet") });
                     return;
                   }
 
                   const res = await validatePromoCode(code, baseTotalUsd);
                   if (!res.ok) {
                     setAppliedPromo(null);
-                      toast({ variant: "destructive", title: "Invalid promo code", description: "The promo code was not found or is not active." });
+                    toast({ variant: "destructive", title: t("order.invalidPromo"), description: t("order.promoNotFound") });
                     return;
                   }
 
@@ -591,10 +593,10 @@ export default function Payment() {
                     promoName: res.promo.promo_name,
                     discountUsd: res.discountUsd,
                   });
-                  toast({ title: "Promo applied", description: `${res.promo.promo_name} (-$${res.discountUsd.toFixed(2)})` });
+                  toast({ title: t("order.promoApplied"), description: `${res.promo.promo_name} (-$${res.discountUsd.toFixed(2)})` });
                 }}
               >
-                Apply
+                {t("order.apply")}
               </Button>
             </div>
           </CardContent>
@@ -602,55 +604,51 @@ export default function Payment() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Final review</CardTitle>
+            <CardTitle className="text-base">{t("order.finalReview")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <div className="rounded-lg border p-4">
-              <p className="font-medium text-foreground">Price breakdown</p>
+              <p className="font-medium text-foreground">{t("order.priceBreakdown")}</p>
               <dl className="mt-3 grid gap-2">
                 <div className="flex items-center justify-between gap-4">
-                  <dt className="text-muted-foreground">Amount</dt>
+                  <dt className="text-muted-foreground">{t("order.amount")}</dt>
                   <dd className="font-medium text-foreground">
-                    {totalAfterPromoUsd == null ? "—" : usdFormatter.format(totalAfterPromoUsd)}
+                    {totalAfterPromoIdr == null ? "—" : formatIdr(totalAfterPromoIdr)}
                   </dd>
                 </div>
               </dl>
             </div>
 
-            <p className="text-muted-foreground">Please review your domain, chosen design, and details in the Order Summary.</p>
+            <p className="text-muted-foreground">{t("order.reviewNote")}</p>
           </CardContent>
         </Card>
 
         <div className="flex items-center justify-between gap-3">
           <Button type="button" variant="outline" onClick={() => navigate("/order/subscription")}>
-            Back
+            {t("common.back")}
           </Button>
-            {method === "card" ? (
-              <PaymentConfirmDialog
-                open={confirmOpen}
-                onOpenChange={(o) => {
-                  if (paying) return;
-                  setConfirmOpen(o);
-                }}
-                confirming={paying}
-                disabled={
-                  gateway == null ||
-                  !canComplete ||
-                  paying ||
-                  totalAfterPromoUsd == null ||
-                  (gateway === "midtrans" ? !midtrans.ready || !isCardFormValid : false)
-                }
-                amountUsdFormatted={totalAfterPromoUsd == null ? "—" : usdFormatter.format(totalAfterPromoUsd)}
-                triggerText={gateway === "xendit" ? "Pay with Xendit" : "Pay with Card"}
-                confirmText={gateway === "xendit" ? "Confirm & Continue" : "Confirm & Pay"}
-                note={
-                  gateway === "xendit"
-                    ? "You will be redirected to Xendit Invoice checkout."
-                    : "During 3DS verification, Midtrans may display the amount in IDR."
-                }
-                onConfirm={gateway === "xendit" ? startXenditInvoice : startCardPayment}
-              />
-            ) : null}
+          {method === "card" ? (
+            <PaymentConfirmDialog
+              open={confirmOpen}
+              onOpenChange={(o) => {
+                if (paying) return;
+                setConfirmOpen(o);
+              }}
+              confirming={paying}
+              disabled={
+                gateway == null ||
+                !canComplete ||
+                paying ||
+                totalAfterPromoUsd == null ||
+                (gateway === "midtrans" ? !midtrans.ready || !isCardFormValid : false)
+              }
+              amountUsdFormatted={totalAfterPromoIdr == null ? "—" : formatIdr(totalAfterPromoIdr)}
+              triggerText={gateway === "xendit" ? t("order.payWithXendit") : t("order.payWithCard")}
+              confirmText={gateway === "xendit" ? t("order.confirmContinue") : t("order.confirmAndPay")}
+              note={gateway === "xendit" ? t("order.redirectXendit") : t("order.midtransIdrNote")}
+              onConfirm={gateway === "xendit" ? startXenditInvoice : startCardPayment}
+            />
+          ) : null}
         </div>
       </div>
     </OrderLayout>
