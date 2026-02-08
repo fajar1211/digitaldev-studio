@@ -372,6 +372,7 @@ export default function Payment() {
         invoice_url: string | null;
         order_db_id: string | null;
         error?: string;
+        xendit?: any;
       }>("xendit-invoice-create", {
         body: {
           amount_usd: totalAfterPromoUsd,
@@ -384,8 +385,25 @@ export default function Payment() {
           customer_email: state.details.email,
         },
       });
-      if (error) throw error;
-      if (!(data as any)?.ok) throw new Error((data as any)?.error ?? "Failed to create invoice");
+
+      // NOTE: When Edge Function returns non-2xx (e.g. 400), supabase-js places info in `error`.
+      // We want to show a friendly, actionable message instead of a technical "Edge function returned 400".
+      if (error) {
+        const raw = String((error as any)?.message ?? "");
+        const looksForbidden = /forbidden|REQUEST_FORBIDDEN_ERROR/i.test(raw);
+        const friendly = looksForbidden
+          ? "Xendit menolak request karena API Key tidak punya izin untuk membuat Invoice. Silakan atur permission API Key (akses Invoices/v2) atau buat Secret Key baru di Xendit Dashboard, lalu update di Super Admin → Integrations → Xendit."
+          : raw || t("order.tryAgain");
+
+        toast({ variant: "destructive", title: t("order.paymentFailedTitle"), description: friendly });
+        return;
+      }
+
+      if (!(data as any)?.ok) {
+        const msg = String((data as any)?.error ?? "").trim() || "Failed to create invoice";
+        toast({ variant: "destructive", title: t("order.paymentFailedTitle"), description: msg });
+        return;
+      }
 
       if ((data as any)?.order_db_id) setLastOrderId(String((data as any).order_db_id));
 
