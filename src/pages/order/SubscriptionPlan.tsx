@@ -48,12 +48,20 @@ export default function SubscriptionPlan() {
     return baseAnnualIdr / 12;
   }, [baseAnnualIdr]);
 
+  const packagePriceIdr = useMemo(() => {
+    const v = Number(pricing.packagePriceUsd ?? 0);
+    return Number.isFinite(v) ? v : 0;
+  }, [pricing.packagePriceUsd]);
+
   const options = useMemo(
     () =>
       subscriptionPlans.map((p) => {
         const months = Number(p.years) * 12;
         const discountPercent = discountByMonths.get(months) ?? 0;
-        const totalIdr = monthlyPriceIdr > 0 ? computeDiscountedTotal({ monthlyPrice: monthlyPriceIdr, months, discountPercent }) : null;
+        const totalIdr =
+          monthlyPriceIdr > 0
+            ? computeDiscountedTotal({ monthlyPrice: monthlyPriceIdr, months, discountPercent })
+            : null;
 
         return {
           years: p.years,
@@ -117,11 +125,26 @@ export default function SubscriptionPlan() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-base font-semibold text-foreground">{opt.label ?? `${opt.years} Years`}</p>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {t("order.allIn")}
-                            {opt.discountPercent > 0 ? ` • Diskon ${Math.round(opt.discountPercent)}%` : ""}
-                          </p>
+                          {(() => {
+                            const raw = (opt.label ?? "").trim();
+                            const normalized = raw
+                              ? raw.replace(/^paket\s*/i, "Durasi ").replace(/tahun/i, "Tahun")
+                              : `Durasi ${opt.years} Tahun`;
+                            const finalLabel = normalized || `Durasi ${opt.years} Tahun`;
+
+                            return (
+                              <>
+                                <p className="text-base font-semibold text-foreground">{finalLabel}</p>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                  {t("order.allIn")}
+                                  {opt.discountPercent > 0 ? ` • Diskon ${Math.round(opt.discountPercent)}%` : ""}
+                                </p>
+                                {packagePriceIdr > 0 ? (
+                                  <p className="mt-1 text-xs text-muted-foreground">Paket: {formatIdr(packagePriceIdr)}</p>
+                                ) : null}
+                              </>
+                            );
+                          })()}
                         </div>
                         {isSelected ? (
                           <Badge variant="secondary">{t("order.selected")}</Badge>
