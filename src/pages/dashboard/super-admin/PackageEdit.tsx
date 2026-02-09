@@ -61,7 +61,7 @@ export default function SuperAdminPackageEdit() {
 
   useEffect(() => {
     if (!id) {
-      navigate("/dashboard/super-admin/marketing-packages", { replace: true });
+      navigate("/dashboard/super-admin/all-packages", { replace: true });
       return;
     }
 
@@ -77,7 +77,7 @@ export default function SuperAdminPackageEdit() {
         if (error) throw error;
         if (!data) {
           toast.error("Package tidak ditemukan");
-          navigate("/dashboard/super-admin/marketing-packages", { replace: true });
+          navigate("/dashboard/super-admin/all-packages", { replace: true });
           return;
         }
 
@@ -176,7 +176,7 @@ export default function SuperAdminPackageEdit() {
       if ((data as any)?.error) throw new Error(String((data as any).error));
 
       toast.success("Package berhasil disimpan");
-      navigate("/dashboard/super-admin/marketing-packages");
+      navigate("/dashboard/super-admin/all-packages");
     } catch (err: any) {
       console.error("Error saving package:", err);
       const msg = err?.message || "Gagal menyimpan package";
@@ -195,12 +195,12 @@ export default function SuperAdminPackageEdit() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => navigate("/dashboard/super-admin/marketing-packages")}
+                onClick={() => navigate("/dashboard/super-admin/all-packages")}
                 aria-label="Back"
                 title="Back"
               >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
             <h1 className="text-3xl font-bold text-foreground">Edit Package</h1>
           </div>
           <p className="text-muted-foreground">Changes here will appear on the onboarding pages.</p>
@@ -392,7 +392,7 @@ export default function SuperAdminPackageEdit() {
                   className="flex-1"
                   type="button"
                   variant="outline"
-                  onClick={() => navigate("/dashboard/super-admin/marketing-packages")}
+                  onClick={() => navigate("/dashboard/super-admin/all-packages")}
                   disabled={saving}
                 >
                   Cancel
