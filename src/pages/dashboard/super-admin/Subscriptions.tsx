@@ -358,7 +358,7 @@ export default function SuperAdminSubscriptions() {
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
-      <h1 className="text-3xl font-bold text-foreground">Website Packages</h1>
+      <h1 className="text-3xl font-bold text-foreground">Duration Packages</h1>
 
       <Tabs defaultValue="subscription" className="w-full">
         <TabsList className="w-full justify-start overflow-x-auto">

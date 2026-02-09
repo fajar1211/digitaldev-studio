@@ -52,8 +52,8 @@ export default function SuperAdminDashboard() {
       { title: "Users & Assists", url: "/dashboard/super-admin/users-assists", icon: Users },
       { title: "Admin Management", url: "/dashboard/super-admin/admin-management", icon: Shield },
       { title: "Access Control", url: "/dashboard/super-admin/access-control", icon: Bell },
-      { title: "Marketing Packages", url: "/dashboard/super-admin/marketing-packages", icon: Package },
-      { title: "Website Packages", url: "/dashboard/super-admin/website-packages", icon: Activity },
+      { title: "All Packages", url: "/dashboard/super-admin/all-packages", icon: Package },
+      { title: "Duration Packages", url: "/dashboard/super-admin/duration-packages", icon: Activity },
       { title: "Payments", url: "/dashboard/super-admin/payments", icon: CreditCard },
       { title: "Promotions", url: "/dashboard/super-admin/promotions", icon: BadgePercent },
       { title: "Audit Logs (soon)", url: "/dashboard/super-admin/audit-logs", icon: FileSearch },
@@ -128,23 +128,25 @@ export default function SuperAdminDashboard() {
           <main className="p-6 bg-background overflow-auto">
             <Routes>
               <Route index element={<SuperAdminOverview />} />
-              <Route
-                path="admin-management"
-                element={<SuperAdminPlaceholder title="Admin Management" />}
-              />
-              <Route
-                path="users-assists"
-                element={<SuperAdminUsersAssists />}
-              />
-              <Route path="marketing-packages" element={<SuperAdminPackages />} />
-              <Route path="marketing-packages/:id" element={<SuperAdminPackageEdit />} />
-              {/* Backward compatible redirect */}
-              <Route path="packages" element={<Navigate to="/dashboard/super-admin/marketing-packages" replace />} />
-              <Route path="packages/:id" element={<Navigate to="/dashboard/super-admin/marketing-packages" replace />} />
+              <Route path="admin-management" element={<SuperAdminPlaceholder title="Admin Management" />} />
+              <Route path="users-assists" element={<SuperAdminUsersAssists />} />
+
+              <Route path="all-packages" element={<SuperAdminPackages />} />
+              <Route path="all-packages/:id" element={<SuperAdminPackageEdit />} />
+
+              {/* Backward compatible redirects */}
+              <Route path="marketing-packages" element={<Navigate to="/dashboard/super-admin/all-packages" replace />} />
+              <Route path="marketing-packages/:id" element={<Navigate to="/dashboard/super-admin/all-packages" replace />} />
+              <Route path="packages" element={<Navigate to="/dashboard/super-admin/all-packages" replace />} />
+              <Route path="packages/:id" element={<Navigate to="/dashboard/super-admin/all-packages" replace />} />
+
+              <Route path="duration-packages" element={<SuperAdminSubscriptions />} />
               <Route path="payments" element={<SuperAdminPayments />} />
-              <Route path="website-packages" element={<SuperAdminSubscriptions />} />
-              {/* Backward compatible redirect */}
-              <Route path="subscriptions" element={<Navigate to="/dashboard/super-admin/website-packages" replace />} />
+
+              {/* Backward compatible redirects */}
+              <Route path="website-packages" element={<Navigate to="/dashboard/super-admin/duration-packages" replace />} />
+              <Route path="subscriptions" element={<Navigate to="/dashboard/super-admin/duration-packages" replace />} />
+
               <Route path="promotions" element={<SuperAdminPromotions />} />
               <Route path="access-control" element={<SuperAdminAccessControl />} />
               <Route path="audit-logs" element={<SuperAdminPlaceholder title="Audit Logs" />} />
