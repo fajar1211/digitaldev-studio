@@ -52,6 +52,23 @@ type SubscriptionAddOnRow = {
   sort_order: number;
 };
 
+type WebsitePlanKey = "website_only" | "blog_social" | "full_digital";
+
+type WebsitePlanDurationDraft = {
+  discount_percent: number;
+  manual_price_per_year: number | null;
+  is_manual_locked: boolean;
+};
+
+type WebsitePlanPricingDraft = {
+  key: WebsitePlanKey;
+  label: string;
+  // price basis for annual calculation
+  base_mode: "monthly" | "yearly";
+  base_price: number; // IDR
+  durations: Record<number, WebsitePlanDurationDraft>; // years => config
+};
+
 
 const SETTINGS_SUBSCRIPTION_PLANS_KEY = "order_subscription_plans";
 
@@ -77,6 +94,11 @@ function safeNumber(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function formatIdr(n: number): string {
+  const v = Math.max(0, Math.floor(Number(n) || 0));
+  return new Intl.NumberFormat("id-ID").format(v);
+}
+
 export default function SuperAdminSubscriptions() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -96,6 +118,50 @@ export default function SuperAdminSubscriptions() {
   const [plansLoading, setPlansLoading] = useState(true);
   const [plansSaving, setPlansSaving] = useState(false);
   const [plans, setPlans] = useState<PlanRow[]>([]);
+
+  const defaultWebsitePlansDraft: Record<WebsitePlanKey, WebsitePlanPricingDraft> = useMemo(
+    () => ({
+      website_only: {
+        key: "website_only",
+        label: "Website Only",
+        base_mode: "yearly",
+        base_price: 0,
+        durations: {},
+      },
+      blog_social: {
+        key: "blog_social",
+        label: "Blog + Social Media",
+        base_mode: "monthly",
+        base_price: 0,
+        durations: {},
+      },
+      full_digital: {
+        key: "full_digital",
+        label: "Full Digital Marketing",
+        base_mode: "monthly",
+        base_price: 0,
+        durations: {},
+      },
+    }),
+    [],
+  );
+
+  // UI-only: draft per selected package id
+  const [websitePlansPricingDraftByPackage, setWebsitePlansPricingDraftByPackage] = useState<
+    Record<string, Record<WebsitePlanKey, WebsitePlanPricingDraft>>
+  >({});
+
+  const selectedPackageDraftKey = String(pricingPackageId || "__no_package_selected");
+  const websitePlansPricingDraft = websitePlansPricingDraftByPackage[selectedPackageDraftKey] ?? defaultWebsitePlansDraft;
+
+  const setWebsitePlansPricingDraft = (
+    updater: (prev: Record<WebsitePlanKey, WebsitePlanPricingDraft>) => Record<WebsitePlanKey, WebsitePlanPricingDraft>,
+  ) => {
+    setWebsitePlansPricingDraftByPackage((prev) => {
+      const current = prev[selectedPackageDraftKey] ?? defaultWebsitePlansDraft;
+      return { ...prev, [selectedPackageDraftKey]: updater(current) };
+    });
+  };
 
   const [addOnsLoading, setAddOnsLoading] = useState(true);
   const [addOnsSaving, setAddOnsSaving] = useState(false);
@@ -255,6 +321,45 @@ export default function SuperAdminSubscriptions() {
     fetchAddOns();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const activeDurationYears = useMemo(() => {
+    return plans
+      .slice()
+      .filter((p) => p.is_active !== false && asNumber(p.years) > 0)
+      .sort((a, b) => asNumber(a.sort_order) - asNumber(b.sort_order) || asNumber(a.years) - asNumber(b.years))
+      .map((p) => asNumber(p.years));
+  }, [plans]);
+
+  useEffect(() => {
+    // Ensure selected package draft always has duration rows for current plans.
+    if (!activeDurationYears.length) return;
+
+    setWebsitePlansPricingDraft((current) => {
+      const next: Record<WebsitePlanKey, WebsitePlanPricingDraft> = { ...current };
+      (Object.keys(next) as WebsitePlanKey[]).forEach((k) => {
+        const plan = next[k];
+        const durations = { ...plan.durations };
+        for (const years of activeDurationYears) {
+          if (!durations[years]) {
+            durations[years] = { discount_percent: 0, manual_price_per_year: null, is_manual_locked: false };
+          }
+        }
+        next[k] = { ...plan, durations };
+      });
+      return next;
+    });
+  }, [activeDurationYears, selectedPackageDraftKey]);
+
+  const computeAnnualBase = (draft: WebsitePlanPricingDraft) => {
+    const base = Math.max(0, Math.floor(asNumber(draft.base_price, 0)));
+    return draft.base_mode === "monthly" ? base * 12 : base;
+  };
+
+  const computeAutoPricePerYear = (draft: WebsitePlanPricingDraft, years: number) => {
+    const annualBase = computeAnnualBase(draft);
+    const discount = Math.min(100, Math.max(0, asNumber(draft.durations?.[years]?.discount_percent, 0)));
+    return Math.round(annualBase * (1 - discount / 100));
+  };
 
   const saveDomainPricing = async () => {
     setPricingSaving(true);
@@ -537,13 +642,175 @@ export default function SuperAdminSubscriptions() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <CardTitle>Website Plans</CardTitle>
-              <CardDescription>Manage “Choose plan duration” options on /order/subscription.</CardDescription>
+              <CardDescription>
+                Draft harga dasar + diskon + harga/tahun per package terpilih: <span className="font-medium">{selectedPackageName}</span>.
+              </CardDescription>
             </div>
             <Badge variant="outline">Total: {plansCountLabel}</Badge>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4">
+          <div className="rounded-lg border border-border bg-muted/10 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <div className="text-sm font-semibold text-foreground">Harga dasar & diskon</div>
+                <div className="text-xs text-muted-foreground">
+                  Diskon bisa beda untuk 1/2/3 tahun (mengikuti daftar di bawah). Jika “Manual” ON, harga/tahun terkunci.
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs">UI only</Badge>
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-3">
+              {(["website_only", "blog_social", "full_digital"] as WebsitePlanKey[]).map((key) => {
+                const draft = websitePlansPricingDraft[key];
+                const annualBase = computeAnnualBase(draft);
+
+                return (
+                  <div key={key} className="rounded-lg border border-border bg-background p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-foreground truncate">{draft.label}</div>
+                        <div className="text-xs text-muted-foreground">Harga dasar: Rp / {draft.base_mode === "monthly" ? "Bulan" : "Tahun"}</div>
+                      </div>
+                      <Badge variant="outline" className="shrink-0">Rp {formatIdr(annualBase)} / Tahun</Badge>
+                    </div>
+
+                    <div className="mt-3 grid gap-2">
+                      <Label className="text-xs">Harga dasar (Rp)</Label>
+                      <Input
+                        className="w-full"
+                        value={String(draft.base_price ?? 0)}
+                        onChange={(e) =>
+                          setWebsitePlansPricingDraft((prev) => ({
+                            ...prev,
+                            [key]: { ...prev[key], base_price: asNumber(e.target.value, 0) },
+                          }))
+                        }
+                        inputMode="numeric"
+                        disabled={!isEditingPlans}
+                      />
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                      {activeDurationYears.map((years) => {
+                        const d = draft.durations[years];
+                        const autoPricePerYear = computeAutoPricePerYear(draft, years);
+                        const shownPricePerYear = d.is_manual_locked
+                          ? asNumber(d.manual_price_per_year ?? autoPricePerYear, autoPricePerYear)
+                          : autoPricePerYear;
+                        const totalForDuration = Math.round(shownPricePerYear * years);
+
+                        return (
+                          <div key={`${key}-${years}`} className="rounded-md border border-border bg-muted/10 p-3">
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div className="text-sm font-medium text-foreground">{years} Tahun</div>
+                              <div className="text-xs text-muted-foreground">Total: Rp {formatIdr(totalForDuration)}</div>
+                            </div>
+
+                            <div className="mt-2 grid gap-2 sm:grid-cols-12 sm:items-end">
+                              <div className="sm:col-span-4 grid gap-2">
+                                <Label className="text-xs">Diskon %</Label>
+                                <Input
+                                  className="w-full"
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  value={String(d.discount_percent ?? 0)}
+                                  onChange={(e) => {
+                                    const v = asNumber(e.target.value, 0);
+                                    setWebsitePlansPricingDraft((prev) => ({
+                                      ...prev,
+                                      [key]: {
+                                        ...prev[key],
+                                        durations: {
+                                          ...prev[key].durations,
+                                          [years]: { ...prev[key].durations[years], discount_percent: v },
+                                        },
+                                      },
+                                    }));
+                                  }}
+                                  inputMode="numeric"
+                                  disabled={!isEditingPlans}
+                                />
+                              </div>
+
+                              <div className="sm:col-span-5 grid gap-2">
+                                <Label className="text-xs">Harga / Tahun (Rp)</Label>
+                                <Input
+                                  className="w-full"
+                                  value={String(shownPricePerYear)}
+                                  onChange={(e) => {
+                                    const v = asNumber(e.target.value, 0);
+                                    setWebsitePlansPricingDraft((prev) => ({
+                                      ...prev,
+                                      [key]: {
+                                        ...prev[key],
+                                        durations: {
+                                          ...prev[key].durations,
+                                          [years]: { ...prev[key].durations[years], manual_price_per_year: v },
+                                        },
+                                      },
+                                    }));
+                                  }}
+                                  inputMode="numeric"
+                                  disabled={!isEditingPlans || !d.is_manual_locked}
+                                />
+                                {!d.is_manual_locked ? (
+                                  <div className="text-[11px] text-muted-foreground">Auto: Rp {formatIdr(autoPricePerYear)} / Tahun</div>
+                                ) : (
+                                  <div className="text-[11px] text-muted-foreground">Manual terkunci.</div>
+                                )}
+                              </div>
+
+                              <div className="sm:col-span-3 flex items-center justify-between rounded-md border border-border bg-background px-3 py-2">
+                                <div className="text-xs font-medium text-foreground">Manual</div>
+                                <Switch
+                                  checked={d.is_manual_locked}
+                                  onCheckedChange={(v) => {
+                                    setWebsitePlansPricingDraft((prev) => {
+                                      const current = prev[key];
+                                      const currentDur = current.durations[years];
+                                      const nextLocked = Boolean(v);
+                                      const nextManual = nextLocked
+                                        ? asNumber(currentDur.manual_price_per_year ?? computeAutoPricePerYear(current, years), 0)
+                                        : null;
+
+                                      return {
+                                        ...prev,
+                                        [key]: {
+                                          ...current,
+                                          durations: {
+                                            ...current.durations,
+                                            [years]: {
+                                              ...currentDur,
+                                              is_manual_locked: nextLocked,
+                                              manual_price_per_year: nextManual,
+                                            },
+                                          },
+                                        },
+                                      };
+                                    });
+                                  }}
+                                  disabled={!isEditingPlans}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {!activeDurationYears.length ? (
+                        <div className="text-xs text-muted-foreground">Belum ada duration aktif. Aktifkan dulu di daftar bawah.</div>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="text-xs text-muted-foreground">{isEditingPlans ? "Edit mode: ON" : "Edit mode: OFF"}</div>
             <Button
