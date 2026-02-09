@@ -11,8 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { invokeWithAuth } from "@/lib/invokeWithAuth";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
-import PackageAddOnsEditor, { type PackageAddOnDraft } from "@/components/super-admin/PackageAddOnsEditor";
-import { DEFAULT_DURATION_PRESETS, formatDurationLabel, type PackageDurationRow } from "@/lib/packageDurations";
+import { type PackageAddOnDraft } from "@/components/super-admin/PackageAddOnsEditor";
+import { type PackageDurationRow } from "@/lib/packageDurations";
 
 type PackageRow = {
   id: string;
@@ -263,118 +263,6 @@ export default function SuperAdminPackageEdit() {
                 />
               </div>
 
-              <PackageAddOnsEditor
-                value={addOns}
-                onChange={setAddOns}
-                onRemove={(idToRemove) => setRemovedAddOnIds((prev) => (prev.includes(idToRemove) ? prev : [...prev, idToRemove]))}
-                disabled={saving}
-              />
-
-              <div className="space-y-3 rounded-lg border border-border p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium text-foreground">Duration & Discount</div>
-                    <div className="text-xs text-muted-foreground">
-                      Opsi durasi untuk onboarding (diskon dari total harga normal per bulan).
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={saving}
-                    onClick={() => {
-                      const existing = new Set(durations.map((d) => Number(d.duration_months)));
-                      const missing = DEFAULT_DURATION_PRESETS.filter((p) => !existing.has(p.months));
-                      if (missing.length === 0) {
-                        toast.info("Preset durations sudah ada semua");
-                        return;
-                      }
-                      setDurations((prev) => [
-                        ...prev,
-                        ...missing.map((m) => ({
-                          duration_months: m.months,
-                          discount_percent: m.discountPercent,
-                          is_active: true,
-                          sort_order: m.sortOrder,
-                        })),
-                      ]);
-                    }}
-                  >
-                    Add Preset (6/12/24/36)
-                  </Button>
-                </div>
-
-                {durations.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">Belum ada duration. Klik “Add Preset”.</div>
-                ) : (
-                  <div className="space-y-3">
-                    {durations
-                      .slice()
-                      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.duration_months - b.duration_months)
-                      .map((d, idx) => (
-                        <div key={d.id ?? `${d.duration_months}-${idx}`} className="grid gap-3 sm:grid-cols-12 items-end">
-                          <div className="sm:col-span-3 grid gap-2">
-                            <Label>Duration</Label>
-                            <Input value={formatDurationLabel(d.duration_months)} disabled />
-                          </div>
-
-                          <div className="sm:col-span-3 grid gap-2">
-                            <Label>Discount %</Label>
-                            <Input
-                              type="number"
-                              min={0}
-                              max={100}
-                              value={d.discount_percent}
-                              onChange={(e) => {
-                                const v = e.target.value === "" ? 0 : Number(e.target.value);
-                                setDurations((prev) =>
-                                  prev.map((x) =>
-                                    x === d ? { ...x, discount_percent: Number.isFinite(v) ? v : 0 } : x
-                                  )
-                                );
-                              }}
-                            />
-                          </div>
-
-                          <div className="sm:col-span-2 grid gap-2">
-                            <Label>Sort</Label>
-                            <Input
-                              type="number"
-                              value={d.sort_order}
-                              onChange={(e) => {
-                                const v = e.target.value === "" ? 0 : Number(e.target.value);
-                                setDurations((prev) => prev.map((x) => (x === d ? { ...x, sort_order: v } : x)));
-                              }}
-                            />
-                          </div>
-
-                          <div className="sm:col-span-2 flex items-center justify-between rounded-lg border border-border px-3 py-2">
-                            <div className="text-sm text-foreground">Active</div>
-                            <Switch
-                              checked={d.is_active}
-                              onCheckedChange={(v) => setDurations((prev) => prev.map((x) => (x === d ? { ...x, is_active: v } : x)))}
-                            />
-                          </div>
-
-                          <div className="sm:col-span-2 flex justify-end">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="w-full"
-                              disabled={saving}
-                              onClick={() => {
-                                if (d.id) setRemovedDurationIds((prev) => (prev.includes(d.id!) ? prev : [...prev, d.id!]));
-                                setDurations((prev) => prev.filter((x) => x !== d));
-                              }}
-                            >
-                              Remove
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
 
               <div className="flex items-center justify-between rounded-lg border border-border p-3">
                 <div>
