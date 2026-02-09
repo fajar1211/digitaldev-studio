@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+import { invokeWithAuth } from "@/lib/invokeWithAuth";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,8 +20,6 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-
-
 
 import { Plus, Save, Trash2 } from "lucide-react";
 import PackageOnboardingSettingsPanel from "@/components/super-admin/PackageOnboardingSettingsPanel";
@@ -52,6 +52,20 @@ type SubscriptionAddOnRow = {
   sort_order: number;
 };
 
+type YearlyPricingRow = {
+  package_id: string;
+  name: string;
+  type: string;
+  description: string | null;
+  features: string[];
+  is_active: boolean;
+
+  base_monthly_text: string;
+  discount_percent_text: string;
+  annual_price_text: string;
+
+  duration_id?: string;
+};
 
 const SETTINGS_SUBSCRIPTION_PLANS_KEY = "order_subscription_plans";
 
@@ -75,6 +89,30 @@ function normalizeTld(input: unknown): string {
 function safeNumber(v: unknown): number {
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : 0;
+}
+
+function clamp(n: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, n));
+}
+
+function computeAnnualPriceFromMonthly(monthly: number, discountPercent: number) {
+  const base = Math.max(0, safeNumber(monthly));
+  const discount = clamp(safeNumber(discountPercent), 0, 100);
+  return Math.round(base * 12 * (1 - discount / 100));
+}
+
+function computeDiscountPercentFromAnnual(monthly: number, annualPrice: number) {
+  const baseMonthly = Math.max(0, safeNumber(monthly));
+  const baseAnnual = baseMonthly * 12;
+  const annual = Math.max(0, safeNumber(annualPrice));
+  if (!baseAnnual) return 0;
+  const discount = (1 - annual / baseAnnual) * 100;
+  return clamp(Number.isFinite(discount) ? discount : 0, 0, 100);
+}
+
+function formatIdr(n: number) {
+  const v = Math.max(0, Math.round(safeNumber(n)));
+  return `Rp ${v.toLocaleString("id-ID")}`;
 }
 
 export default function SuperAdminSubscriptions() {
@@ -101,6 +139,11 @@ export default function SuperAdminSubscriptions() {
   const [addOnsSaving, setAddOnsSaving] = useState(false);
   const [isEditingAddOns, setIsEditingAddOns] = useState(false);
   const [addOns, setAddOns] = useState<SubscriptionAddOnRow[]>([]);
+
+  // Base price (monthly) + yearly price calculator (12 months) for ALL packages
+  const [yearlyLoading, setYearlyLoading] = useState(true);
+  const [yearlySavingId, setYearlySavingId] = useState<string | null>(null);
+  const [yearlyRows, setYearlyRows] = useState<YearlyPricingRow[]>([]);
 
   const fetchDomainPricing = async () => {
     setPricingLoading(true);
@@ -164,6 +207,118 @@ export default function SuperAdminSubscriptions() {
       toast({ variant: "destructive", title: "Error", description: msg });
     } finally {
       setPricingLoading(false);
+    }
+  };
+
+  const fetchYearlyPricing = async () => {
+    setYearlyLoading(true);
+    try {
+      const [{ data: pkgRows, error: pkgErr }, { data: durationRows, error: durErr }] = await Promise.all([
+        (supabase as any)
+          .from("packages")
+          .select("id,name,type,description,price,features,is_active,created_at"),
+        (supabase as any)
+          .from("package_durations")
+          .select("id,package_id,duration_months,discount_percent,is_active,sort_order")
+          .eq("duration_months", 12),
+      ]);
+      if (pkgErr) throw pkgErr;
+      if (durErr) throw durErr;
+
+      const durationByPackage = new Map<string, any>();
+      for (const r of (durationRows as any[]) ?? []) {
+        if (!r?.package_id) continue;
+        durationByPackage.set(String(r.package_id), r);
+      }
+
+      const mapped = Array.isArray(pkgRows)
+        ? (pkgRows as any[]).map((p: any) => {
+            const pkgId = String(p.id);
+            const monthly = safeNumber(p.price);
+            const duration = durationByPackage.get(pkgId);
+            const discount = safeNumber(duration?.discount_percent);
+            const annual = computeAnnualPriceFromMonthly(monthly, discount);
+
+            return {
+              package_id: pkgId,
+              name: String(p.name ?? ""),
+              type: String(p.type ?? ""),
+              description: (p.description ?? null) as string | null,
+              features: Array.isArray(p.features) ? (p.features as any[]).filter((x) => typeof x === "string") : [],
+              is_active: Boolean(p.is_active ?? true),
+              base_monthly_text: String(monthly || 0),
+              discount_percent_text: String(discount || 0),
+              annual_price_text: String(annual || 0),
+              duration_id: duration?.id ? String(duration.id) : undefined,
+            } satisfies YearlyPricingRow;
+          })
+        : [];
+
+      const rank = (pkgType: string) => {
+        const i = PACKAGE_TYPE_ORDER.indexOf(String(pkgType ?? "").toLowerCase().trim() as any);
+        return i === -1 ? 999 : i;
+      };
+
+      mapped.sort((a, b) => {
+        const ra = rank(a.type);
+        const rb = rank(b.type);
+        if (ra !== rb) return ra - rb;
+        return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+      });
+
+      setYearlyRows(mapped);
+    } catch (e: any) {
+      console.error(e);
+      const msg = e?.message || "Failed to load yearly pricing";
+      if (String(msg).toLowerCase().includes("unauthorized")) {
+        navigate("/super-admin/login", { replace: true });
+        return;
+      }
+      toast({ variant: "destructive", title: "Error", description: msg });
+    } finally {
+      setYearlyLoading(false);
+    }
+  };
+
+  const saveYearlyRow = async (row: YearlyPricingRow) => {
+    setYearlySavingId(row.package_id);
+    try {
+      const baseMonthly = Math.max(0, Math.round(safeNumber(row.base_monthly_text)));
+      const discountPercent = clamp(safeNumber(row.discount_percent_text), 0, 100);
+
+      const { error, data } = await invokeWithAuth<{ ok: boolean; error?: string }>("super-admin-save-marketing-package", {
+        package: {
+          id: row.package_id,
+          name: row.name,
+          description: row.description,
+          price: baseMonthly,
+          features: row.features,
+          is_active: row.is_active,
+        },
+        add_ons: [],
+        removed_add_on_ids: [],
+        durations: [
+          {
+            id: row.duration_id,
+            duration_months: 12,
+            discount_percent: discountPercent,
+            is_active: true,
+            sort_order: 20,
+          },
+        ],
+        removed_duration_ids: [],
+      });
+
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error(String((data as any).error));
+
+      toast({ title: "Saved", description: `Updated ${row.name}.` });
+      await fetchYearlyPricing();
+    } catch (e: any) {
+      console.error(e);
+      toast({ variant: "destructive", title: "Failed to save", description: e?.message ?? "Unknown error" });
+    } finally {
+      setYearlySavingId(null);
     }
   };
 
@@ -251,6 +406,7 @@ export default function SuperAdminSubscriptions() {
 
   useEffect(() => {
     fetchDomainPricing();
+    fetchYearlyPricing();
     fetchPlans();
     fetchAddOns();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -404,6 +560,126 @@ export default function SuperAdminSubscriptions() {
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
       <h1 className="text-3xl font-bold text-foreground">Duration Packages</h1>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Harga Dasar & Harga Tahunan</CardTitle>
+          <CardDescription>
+            Untuk semua paket: isi harga dasar per bulan, lalu diskon (%) untuk 12 bulan. Harga per tahun akan otomatis dihitung — atau isi
+            harga per tahun manual untuk menghitung diskonnya.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {yearlyLoading ? <div className="text-sm text-muted-foreground">Loading...</div> : null}
+
+          {!yearlyLoading && !yearlyRows.length ? (
+            <div className="text-sm text-muted-foreground">No packages found.</div>
+          ) : null}
+
+          {!yearlyLoading && yearlyRows.length ? (
+            <div className="space-y-3">
+              {yearlyRows.map((row) => {
+                const baseMonthly = Math.max(0, Math.round(safeNumber(row.base_monthly_text)));
+                const discountPercent = clamp(safeNumber(row.discount_percent_text), 0, 100);
+                const annualAuto = computeAnnualPriceFromMonthly(baseMonthly, discountPercent);
+                const isSaving = yearlySavingId === row.package_id;
+
+                return (
+                  <div key={row.package_id} className="grid gap-3 rounded-md border border-border bg-muted/20 p-3 md:grid-cols-12">
+                    <div className="md:col-span-3">
+                      <div className="text-sm font-semibold text-foreground truncate">{row.name}</div>
+                      <div className="text-xs text-muted-foreground capitalize">{row.type}</div>
+                    </div>
+
+                    <div className="md:col-span-3">
+                      <Label className="text-xs">Harga dasar / bulan (IDR)</Label>
+                      <Input
+                        type="number"
+                        value={row.base_monthly_text}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setYearlyRows((prev) =>
+                            prev.map((r) => {
+                              if (r.package_id !== row.package_id) return r;
+                              const monthly = Math.max(0, Math.round(safeNumber(next)));
+                              const discount = clamp(safeNumber(r.discount_percent_text), 0, 100);
+                              return {
+                                ...r,
+                                base_monthly_text: next,
+                                annual_price_text: String(computeAnnualPriceFromMonthly(monthly, discount)),
+                              };
+                            }),
+                          );
+                        }}
+                        disabled={isSaving}
+                      />
+                      <div className="mt-1 text-xs text-muted-foreground">{formatIdr(baseMonthly)}</div>
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <Label className="text-xs">Diskon (12 bulan) %</Label>
+                      <Input
+                        type="number"
+                        value={row.discount_percent_text}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setYearlyRows((prev) =>
+                            prev.map((r) => {
+                              if (r.package_id !== row.package_id) return r;
+                              const monthly = Math.max(0, Math.round(safeNumber(r.base_monthly_text)));
+                              const discount = clamp(safeNumber(next), 0, 100);
+                              return {
+                                ...r,
+                                discount_percent_text: next,
+                                annual_price_text: String(computeAnnualPriceFromMonthly(monthly, discount)),
+                              };
+                            }),
+                          );
+                        }}
+                        inputMode="decimal"
+                        disabled={isSaving}
+                      />
+                    </div>
+
+                    <div className="md:col-span-3">
+                      <Label className="text-xs">Harga / tahun (12 bulan)</Label>
+                      <Input
+                        type="number"
+                        value={row.annual_price_text}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setYearlyRows((prev) =>
+                            prev.map((r) => {
+                              if (r.package_id !== row.package_id) return r;
+                              const monthly = Math.max(0, Math.round(safeNumber(r.base_monthly_text)));
+                              const annual = Math.max(0, Math.round(safeNumber(next)));
+                              const discount = computeDiscountPercentFromAnnual(monthly, annual);
+                              return {
+                                ...r,
+                                annual_price_text: next,
+                                discount_percent_text: String(Math.round(discount * 100) / 100),
+                              };
+                            }),
+                          );
+                        }}
+                        disabled={isSaving}
+                      />
+                      <div className="mt-1 text-xs text-muted-foreground">Auto dari diskon: {formatIdr(annualAuto)}</div>
+                    </div>
+
+                    <div className="md:col-span-1 flex items-end justify-end">
+                      <Button type="button" size="sm" onClick={() => void saveYearlyRow(row)} disabled={isSaving}>
+                        <Save className="h-4 w-4 mr-2" />
+                        {isSaving ? "Saving" : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
 
       {/* Menu: mengikuti daftar & nama di All Packages */}
       <Card>
