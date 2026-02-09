@@ -29,7 +29,10 @@ function useQuery() {
 function isGrowthOrPro(pkg: Pick<PackageRow, "name" | "type">) {
   const name = (pkg.name ?? "").trim().toLowerCase();
   const type = (pkg.type ?? "").trim().toLowerCase();
-  return name === "growth" || name === "pro" || type === "growth" || type === "pro";
+
+  const isGrowth = name.includes("growth") || type.includes("growth");
+  const isPro = name.includes("pro") || type.includes("pro");
+  return isGrowth || isPro;
 }
 
 export default function SelectPlan() {
