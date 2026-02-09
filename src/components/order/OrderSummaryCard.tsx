@@ -7,7 +7,17 @@ import { useOrderAddOns } from "@/hooks/useOrderAddOns";
 import { useSubscriptionAddOns } from "@/hooks/useSubscriptionAddOns";
 import { useI18n } from "@/hooks/useI18n";
 
-export function OrderSummaryCard({ showEstPrice = true }: { showEstPrice?: boolean }) {
+export function OrderSummaryCard({
+  showEstPrice = true,
+  hideDomain = false,
+  hideStatus = false,
+  hideTemplate = false,
+}: {
+  showEstPrice?: boolean;
+  hideDomain?: boolean;
+  hideStatus?: boolean;
+  hideTemplate?: boolean;
+}) {
   const { t, lang } = useI18n();
   const { state } = useOrder();
   const { contact, subscriptionPlans } = useOrderPublicSettings(state.domain, state.selectedPackageId);
@@ -92,14 +102,18 @@ export function OrderSummaryCard({ showEstPrice = true }: { showEstPrice?: boole
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-sm text-muted-foreground">{t("order.domain")}</span>
-            <span className="text-sm font-medium text-foreground truncate max-w-[220px]">{state.domain || "—"}</span>
-          </div>
+          {!hideDomain ? (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-muted-foreground">{t("order.domain")}</span>
+              <span className="text-sm font-medium text-foreground truncate max-w-[220px]">{state.domain || "—"}</span>
+            </div>
+          ) : null}
 
           <div className="flex items-center justify-between gap-3">
             <span className="text-sm text-muted-foreground">{durationLabel}</span>
-            <span className="text-sm font-medium text-foreground">{durationPriceIdr == null ? "—" : formatIdr(durationPriceIdr)}</span>
+            <span className="text-sm font-medium text-foreground">
+              {durationPriceIdr == null ? "—" : formatIdr(durationPriceIdr)}
+            </span>
           </div>
 
           <div className="flex items-center justify-between gap-3">
@@ -132,21 +146,27 @@ export function OrderSummaryCard({ showEstPrice = true }: { showEstPrice?: boole
             </>
           ) : null}
 
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-sm text-muted-foreground">{t("order.status")}</span>
-            <span className="text-sm">
-              {state.domainStatus ? (
-                <Badge variant={state.domainStatus === "available" ? "secondary" : "outline"}>{state.domainStatus}</Badge>
-              ) : (
-                <span className="text-muted-foreground">—</span>
-              )}
-            </span>
-          </div>
+          {!hideStatus ? (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-muted-foreground">{t("order.status")}</span>
+              <span className="text-sm">
+                {state.domainStatus ? (
+                  <Badge variant={state.domainStatus === "available" ? "secondary" : "outline"}>{state.domainStatus}</Badge>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </span>
+            </div>
+          ) : null}
 
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-sm text-muted-foreground">{t("order.template")}</span>
-            <span className="text-sm font-medium text-foreground truncate max-w-[220px]">{state.selectedTemplateName || "—"}</span>
-          </div>
+          {!hideTemplate ? (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-muted-foreground">{t("order.template")}</span>
+              <span className="text-sm font-medium text-foreground truncate max-w-[220px]">
+                {state.selectedTemplateName || "—"}
+              </span>
+            </div>
+          ) : null}
         </div>
 
         <Separator />
