@@ -19,7 +19,10 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
+
+
 import { Plus, Save, Trash2 } from "lucide-react";
+import PackageOnboardingSettingsPanel from "@/components/super-admin/PackageOnboardingSettingsPanel";
 
 type PackageOption = {
   id: string;
@@ -49,10 +52,12 @@ type SubscriptionAddOnRow = {
   sort_order: number;
 };
 
+
 const SETTINGS_SUBSCRIPTION_PLANS_KEY = "order_subscription_plans";
 
 // Keep ordering consistent with /dashboard/super-admin/all-packages
 const PACKAGE_TYPE_ORDER = ["starter", "growth", "pro", "optimize", "scale", "dominate"] as const;
+
 function asNumber(v: unknown, fallback = 0) {
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : fallback;
@@ -391,7 +396,7 @@ export default function SuperAdminSubscriptions() {
     return found?.name || "(No package selected)";
   }, [packages, pricingPackageId]);
 
-  const isComingSoon = useMemo(() => {
+  const isMarketingPackage = useMemo(() => {
     const n = selectedPackageName.toLowerCase().trim();
     return n === "full digital marketing" || n === "blog + social media";
   }, [selectedPackageName]);
@@ -435,17 +440,10 @@ export default function SuperAdminSubscriptions() {
         </CardContent>
       </Card>
 
-      {isComingSoon ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Coming soon</CardTitle>
-            <CardDescription>
-              Pengaturan untuk package “{selectedPackageName}” belum tersedia di halaman ini.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      {isMarketingPackage ? (
+        <PackageOnboardingSettingsPanel packageId={pricingPackageId} />
       ) : (
-        <> 
+        <>
           {/* Domain Pricing (TLD) - top */}
           <Card>
         <CardHeader>
