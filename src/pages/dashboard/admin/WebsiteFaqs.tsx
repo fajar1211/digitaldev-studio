@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
+import { FaqAnswer } from "@/components/faq/FaqAnswer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -256,8 +257,15 @@ export default function WebsiteFaqs() {
                 value={form.answer}
                 onChange={(e) => setForm((p) => ({ ...p, answer: e.target.value }))}
                 rows={6}
-                placeholder="Write the answer..."
+                placeholder={'Ketik jawaban...\n\nGunakan bullet dengan format:\n- Poin pertama\n- Poin kedua'}
               />
+
+              {!!form.answer.trim() && (
+                <div className="rounded-md border border-border bg-muted/30 p-3">
+                  <div className="text-xs font-medium text-muted-foreground mb-2">Preview</div>
+                  <FaqAnswer text={form.answer} />
+                </div>
+              )}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
