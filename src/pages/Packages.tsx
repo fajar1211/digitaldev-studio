@@ -95,6 +95,7 @@ export default function Packages() {
   const [cardsAlign, setCardsAlign] = useState<PackagesCardsAlign>("center");
   const [faqs, setFaqs] = useState<FaqRow[]>([]);
   const [packages, setPackages] = useState<PublicPackageWithAddOns[]>([]);
+  const [startUrlsMap, setStartUrlsMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   const justifyClass =
@@ -102,7 +103,9 @@ export default function Packages() {
 
   useEffect(() => {
     (async () => {
-      const [faqRes, pkgRes, addOnsRes, layoutRes] = await Promise.all([
+      const PACKAGES_START_URLS_KEY = "packages_start_urls";
+
+      const [faqRes, pkgRes, addOnsRes, layoutRes, startUrlsRes] = await Promise.all([
         supabase
           .from("website_faqs")
           .select("id,page,question,answer,sort_order,is_published,created_at,updated_at")
@@ -123,9 +126,14 @@ export default function Packages() {
           .order("sort_order", { ascending: true })
           .order("created_at", { ascending: true }),
         (supabase as any).from("website_settings").select("value").eq("key", LAYOUT_SETTINGS_KEY).maybeSingle(),
+        (supabase as any).from("website_settings").select("value").eq("key", PACKAGES_START_URLS_KEY).maybeSingle(),
       ]);
 
       if (!faqRes.error) setFaqs((faqRes.data ?? []) as FaqRow[]);
+
+      const startUrls = (startUrlsRes as any)?.data?.value;
+      const map: Record<string, string> = startUrls && typeof startUrls === "object" ? (startUrls as any) : {};
+      setStartUrlsMap(map);
 
       const addOnsByPackageId = new Map<string, PackageAddOnRow[]>();
       if (addOnsRes?.data) {
@@ -214,6 +222,9 @@ export default function Packages() {
               <div className={`flex flex-wrap gap-8 ${justifyClass}`}>
                 {packages.map((pkg, i) => {
                   const features = Array.isArray(pkg.features) ? pkg.features : [];
+                  const startUrl = (startUrlsMap as any)?.[String(pkg.id)] as string | undefined;
+                  const to = startUrl && String(startUrl).trim() ? String(startUrl).trim() : "/auth";
+
                   return (
                     <Card
                       key={pkg.id}
@@ -263,7 +274,7 @@ export default function Packages() {
                       </CardContent>
                       <CardFooter className="pt-6">
                         <Button className="w-full" variant="default" asChild>
-                          <Link to="/auth">
+                          <Link to={to}>
                             {t("packages.getStarted")}
                             <ArrowRight className="ml-2 h-4 w-4" />
                           </Link>

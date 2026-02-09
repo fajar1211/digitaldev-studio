@@ -53,6 +53,7 @@ export default function SuperAdminPackageEdit() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pkg, setPkg] = useState<PackageRow | null>(null);
+  const [startUrl, setStartUrl] = useState<string>("");
   const [addOns, setAddOns] = useState<PackageAddOnDraft[]>([]);
   const [removedAddOnIds, setRemovedAddOnIds] = useState<string[]>([]);
 
@@ -92,14 +93,22 @@ export default function SuperAdminPackageEdit() {
         });
 
         // Load durations for this package
-        const { data: durationRows, error: durationErr } = await (supabase as any)
-          .from("package_durations")
-          .select("id,package_id,duration_months,discount_percent,is_active,sort_order")
-          .eq("package_id", String(data.id))
-          .order("sort_order", { ascending: true })
-          .order("duration_months", { ascending: true });
+        const PACKAGES_START_URLS_KEY = "packages_start_urls";
+        const [{ data: durationRows, error: durationErr }, { data: startUrlsRow, error: startUrlsErr }] = await Promise.all([
+          (supabase as any)
+            .from("package_durations")
+            .select("id,package_id,duration_months,discount_percent,is_active,sort_order")
+            .eq("package_id", String(data.id))
+            .order("sort_order", { ascending: true })
+            .order("duration_months", { ascending: true }),
+          (supabase as any).from("website_settings").select("value").eq("key", PACKAGES_START_URLS_KEY).maybeSingle(),
+        ]);
 
         if (durationErr) throw durationErr;
+        if (startUrlsErr) throw startUrlsErr;
+
+        const startMap = (startUrlsRow as any)?.value;
+        setStartUrl(typeof startMap === "object" && startMap ? String((startMap as any)[String(data.id)] ?? "") : "");
 
         setDurations(
           ((durationRows as PackageDurationRow[]) || []).map((r: any) => ({
@@ -166,6 +175,7 @@ export default function SuperAdminPackageEdit() {
           features: pkg.features,
           is_active: pkg.is_active,
         },
+        start_url: startUrl.trim() ? startUrl.trim() : null,
         add_ons: addOns,
         removed_add_on_ids: removedAddOnIds,
         durations,
@@ -244,6 +254,12 @@ export default function SuperAdminPackageEdit() {
               <div className="grid gap-2">
                 <Label>Description</Label>
                 <Textarea value={pkg.description ?? ""} onChange={(e) => setPkg({ ...pkg, description: e.target.value })} />
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Direct URL (Start)</Label>
+                <Input value={startUrl} onChange={(e) => setStartUrl(e.target.value)} placeholder="/order/choose-domain" />
+                <p className="text-xs text-muted-foreground">Dipakai untuk tombol “Mulai” di halaman /packages. Kosongkan untuk default ke /auth.</p>
               </div>
 
               <div className="grid gap-2">
