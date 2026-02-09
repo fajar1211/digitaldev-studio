@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { PublicLayout } from "@/components/layout/PublicLayout";
 import { PageHero } from "@/components/layout/PageHero";
+import { FaqAnswer } from "@/components/faq/FaqAnswer";
 import heroPackages from "@/assets/hero-packages.jpg";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { useI18n } from "@/hooks/useI18n";
@@ -291,7 +292,7 @@ export default function Packages() {
               <Card key={faq.id} className="shadow-soft">
                 <CardContent className="pt-6">
                   <h3 className="font-semibold text-foreground mb-2">{faq.q}</h3>
-                  <p className="text-muted-foreground">{faq.a}</p>
+                  <FaqAnswer text={faq.a} />
                 </CardContent>
               </Card>
             ))}
