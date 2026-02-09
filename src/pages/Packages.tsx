@@ -37,7 +37,19 @@ type PackageRow = {
   created_at?: string | null;
 };
 
+type PackageAddOnRow = {
+  id: string;
+  package_id: string;
+  label: string;
+  is_active: boolean;
+  sort_order: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 type PublicPackageRow = PackageRow & { is_recommended?: boolean };
+
+type PublicPackageWithAddOns = PublicPackageRow & { addOns: PackageAddOnRow[] };
 
 const PUBLIC_PACKAGE_NAME_ORDER = [
   "starter",
@@ -61,6 +73,13 @@ function sortPackagesForPublic(p1: PublicPackageRow, p2: PublicPackageRow) {
   return a.localeCompare(b);
 }
 
+function sortAddOnsForPublic(a: PackageAddOnRow, b: PackageAddOnRow) {
+  const ao = a.sort_order ?? Number.POSITIVE_INFINITY;
+  const bo = b.sort_order ?? Number.POSITIVE_INFINITY;
+  if (ao !== bo) return ao - bo;
+  return (a.label ?? "").localeCompare(b.label ?? "");
+}
+
 export default function Packages() {
   const { t } = useI18n();
 
@@ -74,7 +93,7 @@ export default function Packages() {
 
   const [cardsAlign, setCardsAlign] = useState<PackagesCardsAlign>("center");
   const [faqs, setFaqs] = useState<FaqRow[]>([]);
-  const [packages, setPackages] = useState<PublicPackageRow[]>([]);
+  const [packages, setPackages] = useState<PublicPackageWithAddOns[]>([]);
   const [loading, setLoading] = useState(true);
 
   const justifyClass =
@@ -82,7 +101,7 @@ export default function Packages() {
 
   useEffect(() => {
     (async () => {
-      const [faqRes, pkgRes, layoutRes] = await Promise.all([
+      const [faqRes, pkgRes, addOnsRes, layoutRes] = await Promise.all([
         supabase
           .from("website_faqs")
           .select("id,page,question,answer,sort_order,is_published,created_at,updated_at")
@@ -96,14 +115,29 @@ export default function Packages() {
           .eq("is_active", true)
           .eq("show_on_public", true)
           .order("created_at", { ascending: true }),
-        (supabase as any)
-          .from("website_settings")
-          .select("value")
-          .eq("key", LAYOUT_SETTINGS_KEY)
-          .maybeSingle(),
+        supabase
+          .from("package_add_ons")
+          .select("id,package_id,label,is_active,sort_order,created_at,updated_at")
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true })
+          .order("created_at", { ascending: true }),
+        (supabase as any).from("website_settings").select("value").eq("key", LAYOUT_SETTINGS_KEY).maybeSingle(),
       ]);
 
       if (!faqRes.error) setFaqs((faqRes.data ?? []) as FaqRow[]);
+
+      const addOnsByPackageId = new Map<string, PackageAddOnRow[]>();
+      if (addOnsRes?.data) {
+        for (const row of addOnsRes.data as PackageAddOnRow[]) {
+          const key = String(row.package_id);
+          const list = addOnsByPackageId.get(key) ?? [];
+          list.push(row);
+          addOnsByPackageId.set(key, list);
+        }
+        for (const [key, list] of addOnsByPackageId) {
+          addOnsByPackageId.set(key, list.slice().sort(sortAddOnsForPublic));
+        }
+      }
 
       if (pkgRes.data) {
         const base = (pkgRes.data as PublicPackageRow[]).slice().sort(sortPackagesForPublic);
@@ -111,10 +145,15 @@ export default function Packages() {
         const nextAlign = raw?.cardsAlign;
         const order = Array.isArray(raw?.packageOrder) ? (raw.packageOrder as string[]) : null;
 
+        let withAddOns: PublicPackageWithAddOns[] = base.map((p) => ({
+          ...p,
+          addOns: addOnsByPackageId.get(String(p.id)) ?? [],
+        }));
+
         if (order && order.length) {
           const rank = new Map<string, number>();
           order.forEach((id, idx) => rank.set(String(id), idx));
-          base.sort((a, b) => {
+          withAddOns = withAddOns.slice().sort((a, b) => {
             const ra = rank.has(a.id) ? (rank.get(a.id) as number) : Number.POSITIVE_INFINITY;
             const rb = rank.has(b.id) ? (rank.get(b.id) as number) : Number.POSITIVE_INFINITY;
             if (ra !== rb) return ra - rb;
@@ -122,7 +161,7 @@ export default function Packages() {
           });
         }
 
-        setPackages(base);
+        setPackages(withAddOns);
 
         if (nextAlign === "left" || nextAlign === "center" || nextAlign === "right") {
           setCardsAlign(nextAlign);
@@ -207,6 +246,19 @@ export default function Packages() {
                             </li>
                           ))}
                         </ul>
+
+                        {pkg.addOns.length > 0 && (
+                          <div className="mt-6 border-t border-border pt-5">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Add-ons</p>
+                            <ul className="mt-3 space-y-2">
+                              {pkg.addOns.map((a) => (
+                                <li key={a.id} className="text-sm text-foreground">
+                                  {a.label}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </CardContent>
                       <CardFooter className="pt-6">
                         <Button className="w-full" variant="default" asChild>
