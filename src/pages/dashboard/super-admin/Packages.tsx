@@ -58,6 +58,8 @@ type PackageDraft = {
   description: string;
   price: string;
   featuresText: string;
+  /** Route path when user clicks "Mulai" on /packages for this package */
+  start_url: string;
   is_active: boolean;
   show_on_public: boolean;
   is_recommended: boolean;
@@ -90,6 +92,7 @@ export default function SuperAdminPackages() {
     description: "",
     price: "0",
     featuresText: "",
+    start_url: "",
     is_active: true,
     show_on_public: true,
     is_recommended: false,
@@ -157,6 +160,7 @@ export default function SuperAdminPackages() {
       description: "",
       price: "0",
       featuresText: "",
+      start_url: "",
       is_active: true,
       show_on_public: true,
       is_recommended: false,
@@ -192,6 +196,26 @@ export default function SuperAdminPackages() {
 
       const { data, error } = await (supabase as any).from("packages").insert(payload).select("id").single();
       if (error) throw error;
+
+      // Save start URL mapping (website_settings)
+      const startUrl = String(draft.start_url ?? "").trim();
+      if (startUrl && data?.id) {
+        const PACKAGES_START_URLS_KEY = "packages_start_urls";
+        const [{ data: row, error: rowErr }] = await Promise.all([
+          (supabase as any).from("website_settings").select("value").eq("key", PACKAGES_START_URLS_KEY).maybeSingle(),
+        ]);
+        if (rowErr) throw rowErr;
+
+        const current = (row as any)?.value;
+        const map: Record<string, string> = current && typeof current === "object" ? { ...(current as any) } : {};
+        const normalized = startUrl.startsWith("/") || /^https?:\/\//i.test(startUrl) ? startUrl : `/${startUrl}`;
+        map[String(data.id)] = normalized;
+
+        const { error: upsertErr } = await (supabase as any)
+          .from("website_settings")
+          .upsert({ key: PACKAGES_START_URLS_KEY, value: map }, { onConflict: "key" });
+        if (upsertErr) throw upsertErr;
+      }
 
       toast.success("Package created");
       setCreateOpen(false);
@@ -309,6 +333,16 @@ export default function SuperAdminPackages() {
                 onChange={(e) => setDraft((p) => ({ ...p, featuresText: e.target.value }))}
                 rows={6}
               />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Direct URL (Start)</Label>
+              <Input
+                value={draft.start_url}
+                onChange={(e) => setDraft((p) => ({ ...p, start_url: e.target.value }))}
+                placeholder="/order/choose-domain"
+              />
+              <p className="text-xs text-muted-foreground">Dipakai untuk tombol “Mulai” di halaman /packages. Kosongkan untuk default ke /auth.</p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">

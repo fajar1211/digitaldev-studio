@@ -37,6 +37,8 @@ type DurationDraft = {
 
 type Payload = {
   package: PackagePayload;
+  /** Optional: when null/empty it will clear for this package */
+  start_url?: string | null;
   add_ons: AddOnDraft[];
   removed_add_on_ids: string[];
   durations: DurationDraft[];
@@ -149,6 +151,36 @@ Deno.serve(async (req) => {
       })
       .eq("id", packageId);
     if (pkgErr) throw pkgErr;
+
+    // Save per-package Start URL mapping in website_settings (no schema change needed)
+    const PACKAGES_START_URLS_KEY = "packages_start_urls";
+    const startUrlRaw = (body as any)?.start_url;
+    const startUrlNormalized = String(startUrlRaw ?? "").trim();
+
+    if (startUrlRaw !== undefined) {
+      const { data: settingsRow, error: settingsErr } = await admin
+        .from("website_settings")
+        .select("value")
+        .eq("key", PACKAGES_START_URLS_KEY)
+        .maybeSingle();
+      if (settingsErr) throw settingsErr;
+
+      const current = (settingsRow as any)?.value;
+      const map: Record<string, string> = current && typeof current === "object" ? { ...(current as any) } : {};
+
+      if (!startUrlNormalized) {
+        delete map[String(packageId)];
+      } else {
+        map[String(packageId)] = startUrlNormalized.startsWith("/") || /^https?:\/\//i.test(startUrlNormalized)
+          ? startUrlNormalized
+          : `/${startUrlNormalized}`;
+      }
+
+      const { error: upsertErr } = await admin
+        .from("website_settings")
+        .upsert({ key: PACKAGES_START_URLS_KEY, value: map }, { onConflict: "key" });
+      if (upsertErr) throw upsertErr;
+    }
 
     const addOns = Array.isArray(body?.add_ons) ? (body.add_ons as any[]) : [];
     const removedAddOnIds = Array.isArray(body?.removed_add_on_ids) ? body.removed_add_on_ids : [];
