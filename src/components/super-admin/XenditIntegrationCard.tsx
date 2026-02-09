@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { KeyRound, RefreshCcw, Save, Trash2 } from "lucide-react";
 
 type Status = {
@@ -15,6 +16,9 @@ type Status = {
 type Props = {
   loading: boolean;
   status: Status;
+  enabled: boolean;
+  onEnabledChange: (enabled: boolean) => void;
+  onSaveEnabled: () => void;
   apiKeyValue: string;
   onApiKeyChange: (v: string) => void;
   onSave: (e: FormEvent) => void;
@@ -25,12 +29,17 @@ type Props = {
 export function XenditIntegrationCard({
   loading,
   status,
+  enabled,
+  onEnabledChange,
+  onSaveEnabled,
   apiKeyValue,
   onApiKeyChange,
   onSave,
   onRefresh,
   onClear,
 }: Props) {
+  const effectiveReady = enabled && status.configured;
+
   return (
     <Card>
       <CardHeader>
@@ -38,7 +47,10 @@ export function XenditIntegrationCard({
           <CardTitle className="flex items-center gap-2">
             <KeyRound className="h-4 w-4" /> Payment Gateway (Xendit)
           </CardTitle>
-          <Badge variant={status.configured ? "default" : "secondary"}>{status.configured ? "Configured" : "Not set"}</Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant={enabled ? "default" : "secondary"}>{enabled ? "Enabled" : "Disabled"}</Badge>
+            <Badge variant={effectiveReady ? "default" : "secondary"}>{effectiveReady ? "Ready" : "Not ready"}</Badge>
+          </div>
         </div>
       </CardHeader>
 
@@ -47,6 +59,23 @@ export function XenditIntegrationCard({
         <span className="font-mono text-foreground"> xnd_development_</span> / <span className="font-mono text-foreground">xnd_production_</span>).
 
         <div className="mt-4 space-y-4">
+          <div className="rounded-md border bg-muted/30 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-foreground">Enable Xendit</div>
+                <div className="text-xs text-muted-foreground">
+                  Jika dimatikan, halaman <span className="font-medium text-foreground">/order</span> tidak akan menggunakan Xendit.
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={enabled} onCheckedChange={onEnabledChange} disabled={loading} />
+                <Button type="button" size="sm" onClick={onSaveEnabled} disabled={loading}>
+                  <Save className="h-4 w-4 mr-2" /> Simpan
+                </Button>
+              </div>
+            </div>
+          </div>
+
           <form onSubmit={onSave} className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="xendit_api_key">Xendit API key</Label>

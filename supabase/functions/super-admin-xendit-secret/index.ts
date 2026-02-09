@@ -12,6 +12,7 @@ const corsHeaders: Record<string, string> = {
 type Payload =
   | { action: "get" }
   | { action: "clear" }
+  | { action: "set_enabled"; enabled: boolean }
   | {
       action: "set";
       api_key: string;
@@ -39,7 +40,25 @@ function validateXenditSecretKey(input: string) {
     };
   }
 
-  return { ok: true as const, apiKey };
+const WS_ENABLED = "xendit_enabled";
+
+function jsonBool(v: unknown, fallback: boolean) {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (s === "true") return true;
+    if (s === "false") return false;
+  }
+  return fallback;
+}
+
+async function writeAuditLog(admin: any, params: { actorUserId: string; action: string; provider: string; metadata?: Record<string, unknown> }) {
+  await admin.from("super_admin_audit_logs").insert({
+    actor_user_id: params.actorUserId,
+    action: params.action,
+    provider: params.provider,
+    metadata: params.metadata ?? {},
+  });
 }
 
 async function requireSuperAdmin(admin: any, userId: string) {
@@ -51,6 +70,13 @@ async function requireSuperAdmin(admin: any, userId: string) {
   if (roleErr) return { ok: false as const, status: 500, error: roleErr.message };
   if ((roleRow as any)?.role !== "super_admin") return { ok: false as const, status: 403, error: "Forbidden" };
   return { ok: true as const, userId };
+}
+
+async function getWebsiteSetting(admin: any, key: string): Promise<{ value: unknown; updated_at: string | null } | null> {
+  const { data, error } = await admin.from("website_settings").select("value,updated_at").eq("key", key).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return { value: (data as any).value, updated_at: (data as any).updated_at ? String((data as any).updated_at) : null };
 }
 
 Deno.serve(async (req) => {
@@ -101,21 +127,45 @@ Deno.serve(async (req) => {
     const body = (await req.json()) as Payload;
 
     if (body.action === "get") {
-      const { data, error } = await admin
-        .from("integration_secrets")
-        .select("updated_at")
-        .eq("provider", "xendit")
-        .eq("name", "api_key")
-        .maybeSingle();
+      const [{ data, error }, enabledSetting] = await Promise.all([
+        admin
+          .from("integration_secrets")
+          .select("updated_at")
+          .eq("provider", "xendit")
+          .eq("name", "api_key")
+          .maybeSingle(),
+        getWebsiteSetting(admin, WS_ENABLED),
+      ]);
       if (error) throw error;
+
+      const enabled = jsonBool(enabledSetting?.value, true);
 
       return new Response(
         JSON.stringify({
+          enabled,
           configured: Boolean(data),
           updated_at: data ? String((data as any).updated_at) : null,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+    }
+
+    if (body.action === "set_enabled") {
+      const enabled = Boolean((body as any).enabled);
+
+      const { error: setErr } = await admin.from("website_settings").upsert({ key: WS_ENABLED, value: enabled }, { onConflict: "key" });
+      if (setErr) throw setErr;
+
+      await writeAuditLog(admin, {
+        actorUserId: String(claimsData.claims.sub),
+        action: "set_setting",
+        provider: "xendit",
+        metadata: { key: WS_ENABLED, enabled, user_agent: req.headers.get("user-agent") },
+      });
+
+      return new Response(JSON.stringify({ ok: true, enabled }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (body.action === "set") {

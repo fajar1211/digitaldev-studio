@@ -57,6 +57,7 @@ export default function SuperAdminCms() {
 
   const [xenditApiKey, setXenditApiKey] = useState("");
   const [xenditConfigured, setXenditConfigured] = useState(false);
+  const [xenditEnabled, setXenditEnabled] = useState(true);
   const [xenditUpdatedAt, setXenditUpdatedAt] = useState<string | null>(null);
 
   const fetchXenditStatus = async () => {
@@ -65,6 +66,7 @@ export default function SuperAdminCms() {
       const { data, error } = await invokeWithAuth<any>("super-admin-xendit-secret", { action: "get" });
       if (error) throw error;
       setXenditConfigured(Boolean((data as any)?.configured));
+      setXenditEnabled(Boolean((data as any)?.enabled ?? true));
       setXenditUpdatedAt(((data as any)?.updated_at ?? null) as string | null);
     } catch (e: any) {
       console.error(e);
@@ -183,6 +185,21 @@ export default function SuperAdminCms() {
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message || "Unable to reset Xendit API key.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onSaveXenditEnabled = async () => {
+    setLoading(true);
+    try {
+      const { error } = await invokeWithAuth<any>("super-admin-xendit-secret", { action: "set_enabled", enabled: xenditEnabled });
+      if (error) throw error;
+      toast.success(`Xendit ${xenditEnabled ? "enabled" : "disabled"}.`);
+      await fetchXenditStatus();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || "Unable to update Xendit enabled setting.");
     } finally {
       setLoading(false);
     }
@@ -511,6 +528,9 @@ export default function SuperAdminCms() {
         <XenditIntegrationCard
           loading={loading}
           status={{ configured: xenditConfigured, updatedAt: xenditUpdatedAt }}
+          enabled={xenditEnabled}
+          onEnabledChange={setXenditEnabled}
+          onSaveEnabled={onSaveXenditEnabled}
           apiKeyValue={xenditApiKey}
           onApiKeyChange={setXenditApiKey}
           onSave={onSaveXenditApiKey}
