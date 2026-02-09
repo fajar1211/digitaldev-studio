@@ -30,7 +30,16 @@ type TldPriceRow = {
 type PlanRow = {
   years: number;
   label: string;
+  /** Final price saved/used by the order flow (IDR) */
   price_usd: number;
+  /** Base price per 1 year (IDR) */
+  base_price_idr: number;
+  /** Discount percent applied to (base_price_idr * years) when manual override is OFF */
+  discount_percent: number;
+  /** When true, override_price_idr is used and auto-calc is locked */
+  manual_override: boolean;
+  /** Manual override for final price (IDR). When null, falls back to price_usd. */
+  override_price_idr: number | null;
   is_active: boolean;
   sort_order: number;
 };
@@ -53,6 +62,21 @@ const PACKAGE_TYPE_ORDER = ["starter", "growth", "pro", "optimize", "scale", "do
 function asNumber(v: unknown, fallback = 0) {
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : fallback;
+}
+
+function clampPercent(v: unknown): number {
+  const n = asNumber(v, 0);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(100, Math.max(0, n));
+}
+
+function computePlanAutoPrice(p: Pick<PlanRow, "years" | "base_price_idr" | "discount_percent">): number {
+  const years = Math.max(1, asNumber(p.years, 1));
+  const base = Math.max(0, asNumber(p.base_price_idr, 0));
+  const discount = clampPercent(p.discount_percent);
+  const gross = base * years;
+  const net = gross * (1 - discount / 100);
+  return Math.max(0, Math.round(net));
 }
 
 function normalizeTld(input: unknown): string {
@@ -197,13 +221,39 @@ export default function SuperAdminSubscriptions() {
       const v = row?.value;
       const parsed = Array.isArray(v)
         ? (v as any[])
-            .map((r) => ({
-              years: asNumber(r?.years),
-              label: String(r?.label ?? "").trim(),
-              price_usd: asNumber(r?.price_usd, 0),
-              is_active: typeof r?.is_active === "boolean" ? r.is_active : true,
-              sort_order: asNumber(r?.sort_order),
-            }))
+            .map((r) => {
+              const years = asNumber(r?.years);
+              const label = String(r?.label ?? "").trim();
+
+              const manual_override = typeof r?.manual_override === "boolean" ? r.manual_override : false;
+              const base_price_idr = asNumber(r?.base_price_idr, 0);
+              const discount_percent = clampPercent(r?.discount_percent);
+              const override_price_idr = r?.override_price_idr === null || r?.override_price_idr === undefined ? null : asNumber(r.override_price_idr, 0);
+
+              // Backward compatible: if legacy rows only had price_usd, treat it as manual override.
+              const legacyFinal = asNumber(r?.price_usd, 0);
+              const hasNewFields = r?.base_price_idr !== undefined || r?.discount_percent !== undefined || r?.override_price_idr !== undefined;
+
+              const nextManual = hasNewFields ? manual_override : true;
+              const nextBase = hasNewFields ? base_price_idr : legacyFinal;
+              const nextOverride = hasNewFields ? override_price_idr : legacyFinal;
+              const nextDiscount = hasNewFields ? discount_percent : 0;
+
+              const autoPrice = computePlanAutoPrice({ years, base_price_idr: nextBase, discount_percent: nextDiscount });
+              const finalPrice = nextManual ? (nextOverride ?? legacyFinal) : autoPrice;
+
+              return {
+                years,
+                label,
+                price_usd: asNumber(finalPrice, 0),
+                base_price_idr: nextBase,
+                discount_percent: nextDiscount,
+                manual_override: nextManual,
+                override_price_idr: nextManual ? (nextOverride ?? legacyFinal) : nextOverride,
+                is_active: typeof r?.is_active === "boolean" ? r.is_active : true,
+                sort_order: asNumber(r?.sort_order),
+              } satisfies PlanRow;
+            })
             .filter((r) => r.years > 0)
         : [];
 
@@ -215,9 +265,39 @@ export default function SuperAdminSubscriptions() {
               sort_order: p.sort_order || p.years,
             }))
           : [
-              { years: 1, label: "1 Year", price_usd: 0, is_active: true, sort_order: 1 },
-              { years: 2, label: "2 Years", price_usd: 0, is_active: true, sort_order: 2 },
-              { years: 3, label: "3 Years", price_usd: 0, is_active: true, sort_order: 3 },
+              {
+                years: 1,
+                label: "1 Year",
+                base_price_idr: 0,
+                discount_percent: 0,
+                manual_override: true,
+                override_price_idr: 0,
+                price_usd: 0,
+                is_active: true,
+                sort_order: 1,
+              },
+              {
+                years: 2,
+                label: "2 Years",
+                base_price_idr: 0,
+                discount_percent: 0,
+                manual_override: true,
+                override_price_idr: 0,
+                price_usd: 0,
+                is_active: true,
+                sort_order: 2,
+              },
+              {
+                years: 3,
+                label: "3 Years",
+                base_price_idr: 0,
+                discount_percent: 0,
+                manual_override: true,
+                override_price_idr: 0,
+                price_usd: 0,
+                is_active: true,
+                sort_order: 3,
+              },
             ],
       );
     } catch (e: any) {
@@ -321,13 +401,30 @@ export default function SuperAdminSubscriptions() {
     setPlansSaving(true);
     try {
       const payload = plans
-        .map((p) => ({
-          years: asNumber(p.years),
-          label: String(p.label ?? "").trim() || `${asNumber(p.years)} Year${asNumber(p.years) > 1 ? "s" : ""}`,
-          price_usd: asNumber(p.price_usd, 0),
-          is_active: p.is_active !== false,
-          sort_order: asNumber(p.sort_order, asNumber(p.years)),
-        }))
+        .map((p) => {
+          const years = asNumber(p.years);
+          const base_price_idr = Math.max(0, asNumber(p.base_price_idr, 0));
+          const discount_percent = clampPercent(p.discount_percent);
+          const manual_override = p.manual_override === true;
+          const override_price_idr = p.override_price_idr === null ? null : Math.max(0, asNumber(p.override_price_idr, 0));
+
+          const autoPrice = computePlanAutoPrice({ years, base_price_idr, discount_percent });
+          const finalPrice = manual_override ? asNumber(override_price_idr ?? p.price_usd ?? 0, 0) : autoPrice;
+
+          return {
+            years,
+            label: String(p.label ?? "").trim() || `${years} Year${years > 1 ? "s" : ""}`,
+            // keep key used by the order flow
+            price_usd: asNumber(finalPrice, 0),
+            // extra fields for admin UX
+            base_price_idr,
+            discount_percent,
+            manual_override,
+            override_price_idr: manual_override ? asNumber(override_price_idr ?? p.price_usd ?? 0, 0) : override_price_idr,
+            is_active: p.is_active !== false,
+            sort_order: asNumber(p.sort_order, years),
+          };
+        })
         .filter((p) => p.years > 0);
 
       const { error } = await (supabase as any)
@@ -337,6 +434,7 @@ export default function SuperAdminSubscriptions() {
 
       toast({ title: "Saved", description: "Subscription plans updated." });
       setIsEditingPlans(false);
+      await fetchPlans();
     } catch (e: any) {
       console.error(e);
       toast({ variant: "destructive", title: "Failed to save", description: e?.message ?? "Unknown error" });
@@ -578,83 +676,184 @@ export default function SuperAdminSubscriptions() {
           {plansLoading ? <div className="text-sm text-muted-foreground">Loading...</div> : null}
 
           {!plansLoading && plans.length ? (
-            plans.map((p, idx) => (
-              <div key={`${p.years}-${idx}`} className="grid min-w-0 gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-12">
-                <div className="min-w-0 md:col-span-2">
-                  <Label className="text-xs">Years</Label>
-                  <Input
-                    className="w-full"
-                    value={String(p.years)}
-                    onChange={(e) =>
-                      setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, years: asNumber(e.target.value) } : x)))
-                    }
-                    inputMode="numeric"
-                    disabled={plansSaving || !isEditingPlans}
-                  />
-                </div>
+            plans.map((p, idx) => {
+              const autoPrice = computePlanAutoPrice({
+                years: p.years,
+                base_price_idr: p.base_price_idr,
+                discount_percent: p.discount_percent,
+              });
+              const isManual = p.manual_override === true;
 
-                <div className="min-w-0 md:col-span-4">
-                  <Label className="text-xs">Label</Label>
-                  <Input
-                    className="w-full"
-                    value={p.label}
-                    onChange={(e) => setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, label: e.target.value } : x)))}
-                    disabled={plansSaving || !isEditingPlans}
-                  />
-                </div>
+              return (
+                <div key={`${p.years}-${idx}`} className="grid min-w-0 gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-12">
+                  <div className="min-w-0 md:col-span-2">
+                    <Label className="text-xs">Years</Label>
+                    <Input
+                      className="w-full"
+                      value={String(p.years)}
+                      onChange={(e) =>
+                        setPlans((prev) =>
+                          prev.map((x, i) => {
+                            if (i !== idx) return x;
+                            const years = asNumber(e.target.value);
+                            const next = { ...x, years };
+                            if (!next.manual_override) next.price_usd = computePlanAutoPrice(next);
+                            return next;
+                          }),
+                        )
+                      }
+                      inputMode="numeric"
+                      disabled={plansSaving || !isEditingPlans}
+                    />
+                  </div>
 
-                <div className="min-w-0 md:col-span-3">
-                  <Label className="text-xs">Price (IDR)</Label>
-                  <Input
-                    className="w-full"
-                    value={String(p.price_usd ?? 0)}
-                    onChange={(e) =>
-                      setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, price_usd: asNumber(e.target.value, 0) } : x)))
-                    }
-                    inputMode="decimal"
-                    disabled={plansSaving || !isEditingPlans}
-                  />
-                </div>
+                  <div className="min-w-0 md:col-span-4">
+                    <Label className="text-xs">Label</Label>
+                    <Input
+                      className="w-full"
+                      value={p.label}
+                      onChange={(e) =>
+                        setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, label: e.target.value } : x)))
+                      }
+                      disabled={plansSaving || !isEditingPlans}
+                    />
+                  </div>
 
-                <div className="min-w-0 md:col-span-2">
-                  <Label className="text-xs">Sort</Label>
-                  <Input
-                    className="w-full"
-                    value={String(p.sort_order)}
-                    onChange={(e) =>
-                      setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, sort_order: asNumber(e.target.value) } : x)))
-                    }
-                    inputMode="numeric"
-                    disabled={plansSaving || !isEditingPlans}
-                  />
-                </div>
+                  <div className="min-w-0 md:col-span-4">
+                    <Label className="text-xs">Pricing</Label>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <div className="min-w-0">
+                        <Label className="text-[11px] text-muted-foreground">Harga dasar / tahun</Label>
+                        <Input
+                          className="w-full"
+                          value={String(p.base_price_idr ?? 0)}
+                          onChange={(e) =>
+                            setPlans((prev) =>
+                              prev.map((x, i) => {
+                                if (i !== idx) return x;
+                                const next = { ...x, base_price_idr: asNumber(e.target.value, 0) };
+                                if (!next.manual_override) next.price_usd = computePlanAutoPrice(next);
+                                return next;
+                              }),
+                            )
+                          }
+                          inputMode="decimal"
+                          disabled={plansSaving || !isEditingPlans || isManual}
+                        />
+                      </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 md:col-span-12">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={p.is_active ? "default" : "secondary"}>{p.is_active ? "On" : "Off"}</Badge>
+                      <div className="min-w-0">
+                        <Label className="text-[11px] text-muted-foreground">Diskon %</Label>
+                        <Input
+                          className="w-full"
+                          value={String(p.discount_percent ?? 0)}
+                          onChange={(e) =>
+                            setPlans((prev) =>
+                              prev.map((x, i) => {
+                                if (i !== idx) return x;
+                                const next = { ...x, discount_percent: clampPercent(e.target.value) };
+                                if (!next.manual_override) next.price_usd = computePlanAutoPrice(next);
+                                return next;
+                              }),
+                            )
+                          }
+                          inputMode="decimal"
+                          disabled={plansSaving || !isEditingPlans || isManual}
+                        />
+                      </div>
+
+                      <div className="min-w-0">
+                        <Label className="text-[11px] text-muted-foreground">
+                          Harga / tahun{isManual ? " (manual)" : " (auto)"}
+                        </Label>
+                        <Input
+                          className="w-full"
+                          value={String(isManual ? p.override_price_idr ?? p.price_usd ?? 0 : autoPrice)}
+                          onChange={(e) =>
+                            setPlans((prev) =>
+                              prev.map((x, i) =>
+                                i === idx
+                                  ? {
+                                      ...x,
+                                      override_price_idr: asNumber(e.target.value, 0),
+                                      price_usd: asNumber(e.target.value, 0),
+                                    }
+                                  : x,
+                              ),
+                            )
+                          }
+                          inputMode="decimal"
+                          disabled={plansSaving || !isEditingPlans || !isManual}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-between rounded-md border bg-background/50 px-3 py-2">
+                      <div className="space-y-0.5">
+                        <div className="text-xs font-medium text-foreground">Override: Manual</div>
+                        <div className="text-[11px] text-muted-foreground">Saat aktif, auto-calc dikunci.</div>
+                      </div>
+                      <Switch
+                        checked={isManual}
+                        onCheckedChange={(v) =>
+                          setPlans((prev) =>
+                            prev.map((x, i) => {
+                              if (i !== idx) return x;
+                              if (v) {
+                                const fallback = x.override_price_idr ?? x.price_usd ?? autoPrice;
+                                return { ...x, manual_override: true, override_price_idr: fallback, price_usd: fallback };
+                              }
+                              const next = { ...x, manual_override: false };
+                              next.price_usd = computePlanAutoPrice(next);
+                              return next;
+                            }),
+                          )
+                        }
+                        disabled={plansSaving || !isEditingPlans}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="min-w-0 md:col-span-2">
+                    <Label className="text-xs">Sort</Label>
+                    <Input
+                      className="w-full"
+                      value={String(p.sort_order)}
+                      onChange={(e) =>
+                        setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, sort_order: asNumber(e.target.value) } : x)))
+                      }
+                      inputMode="numeric"
+                      disabled={plansSaving || !isEditingPlans}
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 md:col-span-12">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant={p.is_active ? "default" : "secondary"}>{p.is_active ? "On" : "Off"}</Badge>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, is_active: !x.is_active } : x)))}
+                        disabled={plansSaving || !isEditingPlans}
+                      >
+                        Toggle
+                      </Button>
+                    </div>
                     <Button
                       type="button"
-                      size="sm"
                       variant="outline"
-                      onClick={() => setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, is_active: !x.is_active } : x)))}
+                      size="icon"
+                      onClick={() => setPlans((prev) => prev.filter((_, i) => i !== idx))}
                       disabled={plansSaving || !isEditingPlans}
+                      aria-label="Remove plan"
                     >
-                      Toggle
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setPlans((prev) => prev.filter((_, i) => i !== idx))}
-                    disabled={plansSaving || !isEditingPlans}
-                    aria-label="Remove plan"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
                 </div>
-              </div>
-            ))
+              );
+            })
           ) : !plansLoading ? (
             <div className="text-sm text-muted-foreground">No plans yet. Click “Add Plan”.</div>
           ) : null}
@@ -669,6 +868,10 @@ export default function SuperAdminSubscriptions() {
                   {
                     years: 1,
                     label: "1 Year",
+                    base_price_idr: 0,
+                    discount_percent: 0,
+                    manual_override: true,
+                    override_price_idr: 0,
                     price_usd: 0,
                     is_active: true,
                     sort_order: prev.length ? Math.max(...prev.map((x) => x.sort_order)) + 1 : 1,
