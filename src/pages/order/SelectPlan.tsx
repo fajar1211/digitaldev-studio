@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Star } from "lucide-react";
+import { Check } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useOrder } from "@/contexts/OrderContext";
@@ -17,7 +17,7 @@ type PackageRow = {
   type: string;
   description: string | null;
   price: number | null;
-  is_recommended?: boolean | null;
+  features: any;
   is_active?: boolean | null;
   show_on_public?: boolean | null;
 };
@@ -57,7 +57,7 @@ export default function SelectPlan() {
       try {
         const { data, error } = await supabase
           .from("packages")
-          .select("id,name,type,description,price,is_recommended,is_active,show_on_public")
+          .select("id,name,type,description,price,features,is_active,show_on_public")
           .eq("is_active", true)
           .eq("show_on_public", true);
 
@@ -112,6 +112,7 @@ export default function SelectPlan() {
                 {rows.map((pkg, i) => {
                   const isSelected = selectedId === pkg.id;
                   const price = Number(pkg.price ?? 0);
+                  const features = Array.isArray(pkg.features) ? (pkg.features as any[]) : [];
 
                   return (
                     <button
@@ -119,7 +120,7 @@ export default function SelectPlan() {
                       type="button"
                       onClick={() => setPackage({ id: pkg.id, name: pkg.name })}
                       className={cn(
-                        "relative w-full overflow-hidden rounded-2xl border bg-card p-5 text-left shadow-soft transition will-change-transform",
+                        "group relative w-full overflow-hidden rounded-2xl border bg-card p-5 text-left shadow-soft transition will-change-transform",
                         "hover:-translate-y-0.5 hover:shadow-lg",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                         isSelected ? "ring-2 ring-primary" : "",
@@ -127,14 +128,14 @@ export default function SelectPlan() {
                       )}
                       style={{ animationDelay: `${i * 0.06}s` }}
                     >
-                      {!!pkg.is_recommended && (
-                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                          <Badge variant="default" className="gap-1">
-                            <Star className="h-3.5 w-3.5" />
-                            Rekomendasi
-                          </Badge>
-                        </div>
-                      )}
+                      {/* subtle top glow bar */}
+                      <div
+                        aria-hidden="true"
+                        className={cn(
+                          "pointer-events-none absolute inset-x-0 top-0 h-1",
+                          isSelected ? "bg-primary" : "bg-muted",
+                        )}
+                      />
 
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -152,7 +153,26 @@ export default function SelectPlan() {
                       </div>
 
                       {pkg.description ? (
-                        <p className="mt-4 text-sm text-muted-foreground line-clamp-3">{pkg.description}</p>
+                        <p className="mt-4 text-sm text-muted-foreground">{pkg.description}</p>
+                      ) : null}
+
+                      {features.length > 0 ? (
+                        <div className="mt-5">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Features</p>
+                          <ul className="mt-3 space-y-2">
+                            {features.slice(0, 6).map((f, idx) => (
+                              <li key={idx} className="flex items-start gap-3 text-sm">
+                                <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted">
+                                  <Check className="h-3.5 w-3.5 text-accent" />
+                                </span>
+                                <span className="text-foreground">{String(f)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          {features.length > 6 ? (
+                            <p className="mt-3 text-xs text-muted-foreground">+{features.length - 6} fitur lainnya</p>
+                          ) : null}
+                        </div>
                       ) : null}
                     </button>
                   );
