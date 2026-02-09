@@ -22,19 +22,14 @@ type PackageOption = {
   type: string;
 };
 
-type TldPriceRow = {
-  tld: string;
-  price_usd: number;
-};
-
 type PlanRow = {
   years: number;
   label: string;
   /** Final price saved/used by the order flow (IDR) */
   price_usd: number;
-  /** Base price per 1 year (IDR) */
+  /** Base price per 1 year OR base price per 1 month (depends on selected package) */
   base_price_idr: number;
-  /** Discount percent applied to (base_price_idr * years) when manual override is OFF */
+  /** Discount percent applied to gross total when manual override is OFF */
   discount_percent: number;
   /** When true, override_price_idr is used and auto-calc is locked */
   manual_override: boolean;
@@ -53,7 +48,6 @@ type SubscriptionAddOnRow = {
   sort_order: number;
 };
 
-
 const SETTINGS_SUBSCRIPTION_PLANS_KEY = "order_subscription_plans";
 
 // Keep ordering consistent with /dashboard/super-admin/all-packages
@@ -70,22 +64,19 @@ function clampPercent(v: unknown): number {
   return Math.min(100, Math.max(0, n));
 }
 
-function computePlanAutoPrice(p: Pick<PlanRow, "years" | "base_price_idr" | "discount_percent">): number {
+function computePlanAutoPrice(
+  p: Pick<PlanRow, "years" | "base_price_idr" | "discount_percent">,
+  opts?: { isMonthlyBase?: boolean },
+): number {
   const years = Math.max(1, asNumber(p.years, 1));
   const base = Math.max(0, asNumber(p.base_price_idr, 0));
   const discount = clampPercent(p.discount_percent);
-  const gross = base * years;
+
+  // For monthly packages: gross = monthlyBase * (12 * years)
+  // For yearly packages: gross = yearlyBase * years
+  const gross = (opts?.isMonthlyBase ? base * 12 * years : base * years);
   const net = gross * (1 - discount / 100);
   return Math.max(0, Math.round(net));
-}
-
-function normalizeTld(input: unknown): string {
-  return String(input ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/^\.+/, "")
-    // support multi-part tld like "co.id" by converting to DB-friendly form "co-id"
-    .replace(/\./g, "-");
 }
 
 function safeNumber(v: unknown): number {
@@ -99,16 +90,10 @@ export default function SuperAdminSubscriptions() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [isEditingPlans, setIsEditingPlans] = useState(false);
-  const [isEditingPricing, setIsEditingPricing] = useState(false);
 
-  // Domain pricing (copied from Admin Domain Tools > Domain tab)
-  const [pricingLoading, setPricingLoading] = useState(true);
-  const [pricingSaving, setPricingSaving] = useState(false);
+  const [packagesLoading, setPackagesLoading] = useState(true);
   const [packages, setPackages] = useState<PackageOption[]>([]);
   const [pricingPackageId, setPricingPackageId] = useState<string>("");
-  const [tldPrices, setTldPrices] = useState<TldPriceRow[]>([]);
-
-  const defaultTldRows: TldPriceRow[] = useMemo(() => ["com", "net", "org", "id"].map((tld) => ({ tld, price_usd: 0 })), []);
 
   const [plansLoading, setPlansLoading] = useState(true);
   const [plansSaving, setPlansSaving] = useState(false);
@@ -121,12 +106,12 @@ export default function SuperAdminSubscriptions() {
     return { value: first, mixed };
   }, [plans]);
 
-  const setBaseYearForAll = (nextBase: number) => {
+  const setBaseYearForAll = (nextBase: number, opts?: { isMonthlyBase?: boolean }) => {
     const base = Math.max(0, asNumber(nextBase, 0));
     setPlans((prev) =>
       prev.map((x) => {
         const next = { ...x, base_price_idr: base };
-        if (!next.manual_override) next.price_usd = computePlanAutoPrice(next);
+        if (!next.manual_override) next.price_usd = computePlanAutoPrice(next, opts);
         return next;
       }),
     );
@@ -149,13 +134,13 @@ export default function SuperAdminSubscriptions() {
     syncPackageIdToUrl(nextId);
   };
 
-  const fetchDomainPricing = async () => {
-    setPricingLoading(true);
+  const fetchPackages = async () => {
+    setPackagesLoading(true);
     try {
-      const [{ data: pkgRows, error: pkgErr }, pricingRes] = await Promise.all([
-        (supabase as any).from("packages").select("id,name,type,created_at,is_active"),
-        (supabase as any).functions.invoke("admin-order-domain-pricing", { body: { action: "get" } }),
-      ]);
+      const { data: pkgRows, error: pkgErr } = await (supabase as any)
+        .from("packages")
+        .select("id,name,type,created_at,is_active")
+        .order("created_at", { ascending: true });
       if (pkgErr) throw pkgErr;
 
       const mapped = Array.isArray(pkgRows)
@@ -183,47 +168,29 @@ export default function SuperAdminSubscriptions() {
         const bn = b.name.toLowerCase();
         if (an < bn) return -1;
         if (an > bn) return 1;
-        // fallback: created_at
         return String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""));
       });
 
       const pkgOptions: PackageOption[] = mapped.map((p) => ({ id: p.id, name: p.name, type: p.type }));
       setPackages(pkgOptions);
 
-      const payload = (pricingRes as any)?.data ?? {};
-      const defaultPackageId = String(payload?.default_package_id ?? "");
-      const priceRows = Array.isArray(payload?.tld_prices) ? (payload.tld_prices as any[]) : [];
-
       const urlPackageId = String(searchParams.get("packageId") ?? "");
       const isUrlValid = urlPackageId && pkgOptions.some((p) => p.id === urlPackageId);
-      const isDefaultPkgValid = defaultPackageId && pkgOptions.some((p) => p.id === defaultPackageId);
 
-      const nextSelectedId = isUrlValid
-        ? urlPackageId
-        : isDefaultPkgValid
-          ? defaultPackageId
-          : pkgOptions.length
-            ? pkgOptions[0].id
-            : "";
+      const nextSelectedId = isUrlValid ? urlPackageId : pkgOptions.length ? pkgOptions[0].id : "";
 
       setPricingPackageId(nextSelectedId);
       if (nextSelectedId && nextSelectedId !== urlPackageId) syncPackageIdToUrl(nextSelectedId);
-
-      const normalized = priceRows
-        .map((r) => ({ tld: normalizeTld(r?.tld), price_usd: safeNumber(r?.price_usd) }))
-        .filter((r) => r.tld);
-
-      setTldPrices(normalized.length ? normalized : defaultTldRows);
     } catch (e: any) {
       console.error(e);
-      const msg = e?.message || "Failed to load Domain Pricing";
+      const msg = e?.message || "Failed to load packages";
       if (String(msg).toLowerCase().includes("unauthorized")) {
         navigate("/super-admin/login", { replace: true });
         return;
       }
       toast({ variant: "destructive", title: "Error", description: msg });
     } finally {
-      setPricingLoading(false);
+      setPackagesLoading(false);
     }
   };
 
@@ -372,7 +339,7 @@ export default function SuperAdminSubscriptions() {
   };
 
   useEffect(() => {
-    fetchDomainPricing();
+    fetchPackages();
     fetchPlans();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -383,47 +350,11 @@ export default function SuperAdminSubscriptions() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pricingPackageId]);
 
-  const saveDomainPricing = async () => {
-    setPricingSaving(true);
-    try {
-      const pkgId = String(pricingPackageId ?? "").trim() || String(packages?.[0]?.id ?? "").trim();
-      const isPkgValid = pkgId && packages.some((p) => p.id === pkgId);
-      if (!isPkgValid) {
-        toast({
-          variant: "destructive",
-          title: "Save failed",
-          description: "Selected package is not valid anymore. Please refresh and select an existing package.",
-        });
-        return;
-      }
-
-      const cleaned = tldPrices
-        .map((r) => ({ tld: normalizeTld(r.tld), price_usd: safeNumber(r.price_usd) }))
-        .filter((r) => r.tld && Number.isFinite(r.price_usd) && r.price_usd >= 0);
-
-      const dedupedMap = new Map<string, number>();
-      for (const row of cleaned) dedupedMap.set(row.tld, row.price_usd);
-      const deduped = Array.from(dedupedMap.entries()).map(([tld, price_usd]) => ({ tld, price_usd }));
-
-      const { data, error } = await (supabase as any).functions.invoke("admin-order-domain-pricing", {
-        body: {
-          action: "set",
-          default_package_id: pkgId,
-          tld_prices: deduped,
-        },
-      });
-      if (error) throw error;
-      if ((data as any)?.error) throw new Error((data as any).error);
-
-      toast({ title: "Saved", description: "Domain pricing updated." });
-      await fetchDomainPricing();
-      setIsEditingPricing(false);
-    } catch (e: any) {
-      console.error(e);
-      toast({ variant: "destructive", title: "Failed to save", description: e?.message ?? "Unknown error" });
-    } finally {
-      setPricingSaving(false);
-    }
+  const isMonthlyBaseForPlans = () => {
+    const name = String(packages.find((p) => p.id === pricingPackageId)?.name ?? "")
+      .toLowerCase()
+      .trim();
+    return name === "full digital marketing" || name === "blog + social media";
   };
 
   const savePlans = async () => {
@@ -437,7 +368,10 @@ export default function SuperAdminSubscriptions() {
           const manual_override = p.manual_override === true;
           const override_price_idr = p.override_price_idr === null ? null : Math.max(0, asNumber(p.override_price_idr, 0));
 
-          const autoPrice = computePlanAutoPrice({ years, base_price_idr, discount_percent });
+          const autoPrice = computePlanAutoPrice(
+            { years, base_price_idr, discount_percent },
+            { isMonthlyBase: isMonthlyBaseForPlans() },
+          );
           const finalPrice = manual_override ? asNumber(override_price_idr ?? p.price_usd ?? 0, 0) : autoPrice;
 
           return {
@@ -547,6 +481,8 @@ export default function SuperAdminSubscriptions() {
     return n === "full digital marketing" || n === "blog + social media";
   }, [selectedPackageName]);
 
+  const planAutoOpts = useMemo(() => ({ isMonthlyBase: isMarketingPackage }), [isMarketingPackage]);
+
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
       <h1 className="text-3xl font-bold text-foreground">Duration Packages</h1>
@@ -559,14 +495,13 @@ export default function SuperAdminSubscriptions() {
             <span className="font-semibold">{selectedPackageName}</span>
           </CardTitle>
           <CardDescription>
-            Pilih package (mengikuti nama di halaman All Packages). Domain Pricing akan tersimpan ke package yang dipilih.
-            Website Plans & Add-ons tetap global.
+            Pilih package (mengikuti nama di halaman All Packages). Add-ons tersimpan per package, sedangkan Website Plans bersifat global.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
           <Label className="text-xs">Select Package</Label>
 
-          {pricingLoading ? (
+          {packagesLoading ? (
             <div className="text-sm text-muted-foreground">Loading packages...</div>
           ) : packages.length === 0 ? (
             <div className="text-sm text-muted-foreground">No active packages.</div>
@@ -575,7 +510,7 @@ export default function SuperAdminSubscriptions() {
               <div className="w-full overflow-x-auto">
                 <TabsList className="inline-flex w-max justify-start">
                   {packages.map((p) => (
-                    <TabsTrigger key={p.id} value={p.id} disabled={pricingSaving}>
+                    <TabsTrigger key={p.id} value={p.id} disabled={plansSaving || addOnsSaving}>
                       {p.name}
                     </TabsTrigger>
                   ))}
@@ -586,96 +521,7 @@ export default function SuperAdminSubscriptions() {
         </CardContent>
       </Card>
 
-      {isMarketingPackage ? (
-        <PackageOnboardingSettingsPanel packageId={pricingPackageId} />
-      ) : (
-        <>
-          {/* Domain Pricing (TLD) - top */}
-          <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <CardTitle>Domain Pricing (TLD)</CardTitle>
-              <CardDescription>Set per-TLD domain prices for /order/choose-domain.</CardDescription>
-            </div>
-            <Badge variant="outline">Rows: {tldPrices.length}</Badge>
-          </div>
-        </CardHeader>
-
-        <CardContent className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="text-xs text-muted-foreground">{isEditingPricing ? "Edit mode: ON" : "Edit mode: OFF"}</div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setIsEditingPricing((v) => !v)}
-              disabled={pricingSaving}
-            >
-              {isEditingPricing ? "Cancel" : "Edit"}
-            </Button>
-          </div>
-
-          {pricingLoading ? <div className="text-sm text-muted-foreground">Loading...</div> : null}
-
-          {!pricingLoading && tldPrices.length ? (
-            tldPrices.map((r, idx) => (
-              <div key={`${r.tld}-${idx}`} className="grid gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-5">
-                <div className="md:col-span-2">
-                  <Label className="text-xs">TLD</Label>
-                  <Input
-                    value={String(r.tld ?? "")}
-                    onChange={(e) => setTldPrices((prev) => prev.map((x, i) => (i === idx ? { ...x, tld: e.target.value } : x)))}
-                    placeholder="com"
-                    disabled={pricingSaving || !isEditingPricing}
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <Label className="text-xs">Price (IDR)</Label>
-                  <Input
-                    value={String(r.price_usd)}
-                    onChange={(e) =>
-                      setTldPrices((prev) =>
-                        prev.map((x, i) => (i === idx ? { ...x, price_usd: safeNumber(e.target.value) } : x))
-                      )
-                    }
-                    inputMode="decimal"
-                    disabled={pricingSaving || !isEditingPricing}
-                  />
-                </div>
-                <div className="flex items-end justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setTldPrices((prev) => prev.filter((_, i) => i !== idx))}
-                    disabled={pricingSaving || !isEditingPricing || tldPrices.length <= 1}
-                    aria-label="Remove tld"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))
-          ) : !pricingLoading ? (
-            <div className="text-sm text-muted-foreground">No pricing rows yet.</div>
-          ) : null}
-
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setTldPrices((prev) => [...prev, { tld: "", price_usd: 0 }])}
-              disabled={pricingSaving || !isEditingPricing}
-            >
-              <Plus className="h-4 w-4 mr-2" /> Add TLD
-            </Button>
-            <Button type="button" onClick={saveDomainPricing} disabled={pricingSaving || !isEditingPricing}>
-              <Save className="h-4 w-4 mr-2" /> Save Pricing
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {isMarketingPackage ? <PackageOnboardingSettingsPanel packageId={pricingPackageId} /> : null}
 
       {/* Website Plans - middle */}
       <Card>
@@ -705,11 +551,11 @@ export default function SuperAdminSubscriptions() {
 
           <div className="grid gap-2 rounded-md border bg-muted/20 p-3 sm:grid-cols-12">
             <div className="sm:col-span-4">
-              <Label className="text-xs">Harga dasar / tahun</Label>
+              <Label className="text-xs">{isMarketingPackage ? "Harga dasar / bulan" : "Harga dasar / tahun"}</Label>
               <Input
                 className="w-full"
                 value={String(baseYearMeta.value ?? 0)}
-                onChange={(e) => setBaseYearForAll(asNumber(e.target.value, 0))}
+                onChange={(e) => setBaseYearForAll(asNumber(e.target.value, 0), planAutoOpts)}
                 inputMode="decimal"
                 disabled={plansSaving || !isEditingPlans}
               />
@@ -730,11 +576,14 @@ export default function SuperAdminSubscriptions() {
 
           {!plansLoading && plans.length ? (
             plans.map((p, idx) => {
-              const autoPrice = computePlanAutoPrice({
-                years: p.years,
-                base_price_idr: p.base_price_idr,
-                discount_percent: p.discount_percent,
-              });
+              const autoPrice = computePlanAutoPrice(
+                {
+                  years: p.years,
+                  base_price_idr: p.base_price_idr,
+                  discount_percent: p.discount_percent,
+                },
+                planAutoOpts,
+              );
               const isManual = p.manual_override === true;
 
               return (
@@ -750,7 +599,7 @@ export default function SuperAdminSubscriptions() {
                             if (i !== idx) return x;
                             const years = asNumber(e.target.value);
                             const next = { ...x, years };
-                            if (!next.manual_override) next.price_usd = computePlanAutoPrice(next);
+                            if (!next.manual_override) next.price_usd = computePlanAutoPrice(next, planAutoOpts);
                             return next;
                           }),
                         )
@@ -786,7 +635,7 @@ export default function SuperAdminSubscriptions() {
                               prev.map((x, i) => {
                                 if (i !== idx) return x;
                                 const next = { ...x, discount_percent: clampPercent(e.target.value) };
-                                if (!next.manual_override) next.price_usd = computePlanAutoPrice(next);
+                                if (!next.manual_override) next.price_usd = computePlanAutoPrice(next, planAutoOpts);
                                 return next;
                               }),
                             )
@@ -823,7 +672,9 @@ export default function SuperAdminSubscriptions() {
                     </div>
 
                     <div className="mt-1 text-[11px] text-muted-foreground">
-                      Dasar: {baseYearMeta.value ?? 0} × {p.years} tahun
+                      {isMarketingPackage
+                        ? `Dasar: ${baseYearMeta.value ?? 0} × 12 × ${p.years} tahun`
+                        : `Dasar: ${baseYearMeta.value ?? 0} × ${p.years} tahun`}
                     </div>
 
                     <div className="mt-2 flex items-center justify-between rounded-md border bg-background/50 px-3 py-2">
@@ -842,7 +693,7 @@ export default function SuperAdminSubscriptions() {
                                 return { ...x, manual_override: true, override_price_idr: fallback, price_usd: fallback };
                               }
                               const next = { ...x, manual_override: false };
-                              next.price_usd = computePlanAutoPrice(next);
+                              next.price_usd = computePlanAutoPrice(next, planAutoOpts);
                               return next;
                             }),
                           )
@@ -927,9 +778,6 @@ export default function SuperAdminSubscriptions() {
           </div>
         </CardContent>
       </Card>
-
-        </>
-      )}
 
       {/* Add-ons (per package) */}
       <Card>
