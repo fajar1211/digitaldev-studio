@@ -113,34 +113,48 @@ export default function SelectPlan() {
                       type="button"
                       onClick={() => setPackage({ id: pkg.id, name: pkg.name })}
                       className={cn(
-                        "w-full rounded-xl border bg-card p-4 text-left shadow-soft transition",
-                        isSelected ? "ring-2 ring-ring bg-accent/30" : "hover:bg-muted/30",
+                        "group w-full rounded-2xl border bg-card p-5 text-left shadow-soft transition",
+                        "hover:-translate-y-0.5 hover:shadow",
+                        isSelected ? "ring-2 ring-ring bg-accent/30" : "hover:bg-muted/20",
                       )}
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
-                          <p className="text-base font-semibold text-foreground truncate">{pkg.name}</p>
+                          <p className="text-lg font-semibold text-foreground leading-tight truncate">{pkg.name}</p>
                           <p className="mt-1 text-sm text-muted-foreground">{pkg.description || pkg.type}</p>
-
-                          {Array.isArray(pkg.features) && pkg.features.length ? (
-                            <ul className="mt-3 space-y-1 text-sm text-muted-foreground list-disc pl-5">
-                              {pkg.features.map((f: any, i: number) => (
-                                <li key={i}>{String(f)}</li>
-                              ))}
-                            </ul>
-                          ) : null}
                         </div>
-                        {pkg.is_recommended ? (
-                          <Badge variant="secondary">Rekomendasi</Badge>
-                        ) : (
-                          <Badge variant="outline">Plan</Badge>
-                        )}
+
+                        <div className="shrink-0 flex items-center gap-2">
+                          {pkg.is_recommended ? (
+                            <Badge variant="secondary">Rekomendasi</Badge>
+                          ) : (
+                            <Badge variant="outline">Plan</Badge>
+                          )}
+                        </div>
                       </div>
-                      <div className="mt-4">
-                        <p className="text-2xl font-bold text-foreground">
-                          Rp {Number(pkg.price ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 0 })}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">Harga dasar (belum termasuk durasi).</p>
+
+                      {Array.isArray(pkg.features) && pkg.features.length ? (
+                        <div className="mt-4 rounded-xl border bg-muted/20 p-4">
+                          <p className="text-sm font-medium text-foreground">Fitur</p>
+                          <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                            {pkg.features.map((f: any, i: number) => (
+                              <li key={i} className="flex gap-2">
+                                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/30" />
+                                <span className="leading-6">{String(f)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+
+                      <div className="mt-5 flex items-end justify-between gap-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Harga dasar</p>
+                          <p className="mt-1 text-2xl font-bold text-foreground">
+                            Rp {Number(pkg.price ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                          </p>
+                        </div>
+                        <div className={cn("text-xs text-muted-foreground", isSelected ? "text-foreground" : "")}>Klik untuk pilih</div>
                       </div>
                     </button>
                   );
