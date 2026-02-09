@@ -10,7 +10,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
 import { Plus, Save, Trash2 } from "lucide-react";
@@ -360,385 +359,369 @@ export default function SuperAdminSubscriptions() {
     <div className="mx-auto w-full max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
       <h1 className="text-3xl font-bold text-foreground">Duration Packages</h1>
 
-      <Tabs defaultValue="subscription" className="w-full">
-        <TabsList className="w-full justify-start overflow-x-auto">
-          <TabsTrigger value="subscription">Plans</TabsTrigger>
-          <TabsTrigger value="add-ons">Add-ons</TabsTrigger>
-          <TabsTrigger value="domain">Domain</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="subscription">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                      <CardTitle>Website Plans</CardTitle>
-                      <CardDescription>Manage “Choose plan duration” options on /order/subscription.</CardDescription>
-                  </div>
-                  <Badge variant="outline">Total: {plansCountLabel}</Badge>
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-xs text-muted-foreground">{isEditingPlans ? "Edit mode: ON" : "Edit mode: OFF"}</div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsEditingPlans((v) => !v)}
-                    disabled={plansSaving}
-                  >
-                    {isEditingPlans ? "Cancel" : "Edit"}
-                  </Button>
-                </div>
-
-                {plansLoading ? <div className="text-sm text-muted-foreground">Loading...</div> : null}
-
-                {!plansLoading && plans.length ? (
-                  plans.map((p, idx) => (
-                    <div
-                      key={`${p.years}-${idx}`}
-                      className="grid min-w-0 gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-12"
-                    >
-                      <div className="min-w-0 md:col-span-2">
-                        <Label className="text-xs">Years</Label>
-                        <Input
-                          className="w-full"
-                          value={String(p.years)}
-                          onChange={(e) =>
-                            setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, years: asNumber(e.target.value) } : x)))
-                          }
-                          inputMode="numeric"
-                          disabled={plansSaving || !isEditingPlans}
-                        />
-                      </div>
-
-                      <div className="min-w-0 md:col-span-4">
-                        <Label className="text-xs">Label</Label>
-                        <Input
-                          className="w-full"
-                          value={p.label}
-                          onChange={(e) => setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, label: e.target.value } : x)))}
-                          disabled={plansSaving || !isEditingPlans}
-                        />
-                      </div>
-
-                      <div className="min-w-0 md:col-span-3">
-                        <Label className="text-xs">Price (IDR)</Label>
-                        <Input
-                          className="w-full"
-                          value={String(p.price_usd ?? 0)}
-                          onChange={(e) =>
-                            setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, price_usd: asNumber(e.target.value, 0) } : x)))
-                          }
-                          inputMode="decimal"
-                          disabled={plansSaving || !isEditingPlans}
-                        />
-                      </div>
-
-                      <div className="min-w-0 md:col-span-2">
-                        <Label className="text-xs">Sort</Label>
-                        <Input
-                          className="w-full"
-                          value={String(p.sort_order)}
-                          onChange={(e) =>
-                            setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, sort_order: asNumber(e.target.value) } : x)))
-                          }
-                          inputMode="numeric"
-                          disabled={plansSaving || !isEditingPlans}
-                        />
-                      </div>
-
-                      <div className="flex flex-wrap items-center justify-between gap-2 md:col-span-12">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant={p.is_active ? "default" : "secondary"}>{p.is_active ? "On" : "Off"}</Badge>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, is_active: !x.is_active } : x)))}
-                            disabled={plansSaving || !isEditingPlans}
-                          >
-                            Toggle
-                          </Button>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          onClick={() => setPlans((prev) => prev.filter((_, i) => i !== idx))}
-                          disabled={plansSaving || !isEditingPlans}
-                          aria-label="Remove plan"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                ) : !plansLoading ? (
-                  <div className="text-sm text-muted-foreground">No plans yet. Click “Add Plan”.</div>
-                ) : null}
-
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() =>
-                      setPlans((prev) => [
-                        ...prev,
-                        {
-                          years: 1,
-                          label: "1 Year",
-                          price_usd: 0,
-                          is_active: true,
-                          sort_order: prev.length ? Math.max(...prev.map((x) => x.sort_order)) + 1 : 1,
-                        },
-                      ])
-                    }
-                    disabled={plansSaving || !isEditingPlans}
-                  >
-                    <Plus className="h-4 w-4 mr-2" /> Add Plan
-                  </Button>
-
-                  <Button type="button" onClick={savePlans} disabled={plansSaving || !isEditingPlans}>
-                    <Save className="h-4 w-4 mr-2" /> Save
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+      {/* Domain Pricing (TLD) - top */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle>Domain Pricing (TLD)</CardTitle>
+              <CardDescription>Set per-TLD domain prices for /order/choose-domain.</CardDescription>
+            </div>
+            <Badge variant="outline">Rows: {tldPrices.length}</Badge>
           </div>
-        </TabsContent>
+        </CardHeader>
 
-        <TabsContent value="add-ons">
-          <Card>
-            <CardHeader>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <CardTitle>Add-ons</CardTitle>
-                  <CardDescription>Checklist add-ons yang tampil di bawah pilihan durasi pada /order/subscription.</CardDescription>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs text-muted-foreground">{isEditingPricing ? "Edit mode: ON" : "Edit mode: OFF"}</div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEditingPricing((v) => !v)}
+              disabled={pricingSaving}
+            >
+              {isEditingPricing ? "Cancel" : "Edit"}
+            </Button>
+          </div>
+
+          {pricingLoading ? <div className="text-sm text-muted-foreground">Loading...</div> : null}
+
+          {!pricingLoading && tldPrices.length ? (
+            tldPrices.map((r, idx) => (
+              <div key={`${r.tld}-${idx}`} className="grid gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-5">
+                <div className="md:col-span-2">
+                  <Label className="text-xs">TLD</Label>
+                  <Input
+                    value={String(r.tld ?? "")}
+                    onChange={(e) => setTldPrices((prev) => prev.map((x, i) => (i === idx ? { ...x, tld: e.target.value } : x)))}
+                    placeholder="com"
+                    disabled={pricingSaving || !isEditingPricing}
+                  />
                 </div>
-                <Badge variant="outline">Total: {addOnsCountLabel}</Badge>
-              </div>
-            </CardHeader>
-
-            <CardContent className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-xs text-muted-foreground">{isEditingAddOns ? "Edit mode: ON" : "Edit mode: OFF"}</div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsEditingAddOns((v) => !v)}
-                  disabled={addOnsSaving}
-                >
-                  {isEditingAddOns ? "Cancel" : "Edit"}
-                </Button>
-              </div>
-
-              {addOnsLoading ? <div className="text-sm text-muted-foreground">Loading...</div> : null}
-
-              {!addOnsLoading && addOns.length ? (
-                <div className="space-y-3">
-                  {addOns.map((a, idx) => (
-                    <div key={a.id ?? `new-${idx}`} className="grid gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-12">
-                      <div className="md:col-span-3">
-                        <Label className="text-xs">Label</Label>
-                        <Input
-                          value={a.label}
-                          onChange={(e) => setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, label: e.target.value } : x)))}
-                          disabled={addOnsSaving || !isEditingAddOns}
-                          placeholder="e.g. Jasa Editing Website"
-                        />
-                      </div>
-
-                      <div className="md:col-span-4">
-                        <Label className="text-xs">Description</Label>
-                        <Textarea
-                          value={a.description}
-                          onChange={(e) => setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, description: e.target.value } : x)))}
-                          disabled={addOnsSaving || !isEditingAddOns}
-                          placeholder="Optional"
-                          rows={2}
-                        />
-                      </div>
-
-                      <div className="md:col-span-2">
-                        <Label className="text-xs">Price (IDR)</Label>
-                        <Input
-                          value={String(a.price_idr ?? 0)}
-                          onChange={(e) =>
-                            setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, price_idr: safeNumber(e.target.value) } : x)))
-                          }
-                          inputMode="numeric"
-                          disabled={addOnsSaving || !isEditingAddOns}
-                        />
-                      </div>
-
-                      <div className="md:col-span-1">
-                        <Label className="text-xs">Active</Label>
-                        <div className="pt-2">
-                          <Switch
-                            checked={Boolean(a.is_active)}
-                            onCheckedChange={(v) => setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, is_active: Boolean(v) } : x)))}
-                            disabled={addOnsSaving || !isEditingAddOns}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="md:col-span-1">
-                        <Label className="text-xs">Sort</Label>
-                        <Input
-                          value={String(a.sort_order ?? idx)}
-                          onChange={(e) =>
-                            setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, sort_order: asNumber(e.target.value, idx) } : x)))
-                          }
-                          inputMode="numeric"
-                          disabled={addOnsSaving || !isEditingAddOns}
-                        />
-                      </div>
-
-                      <div className="md:col-span-1 flex items-end justify-end">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          onClick={async () => {
-                            const id = String(a.id ?? "");
-                            setAddOns((prev) => prev.filter((_, i) => i !== idx));
-                            if (id) await deleteAddOn(id);
-                          }}
-                          disabled={addOnsSaving || !isEditingAddOns}
-                          aria-label="Remove add-on"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                <div className="md:col-span-2">
+                  <Label className="text-xs">Price (IDR)</Label>
+                  <Input
+                    value={String(r.price_usd)}
+                    onChange={(e) =>
+                      setTldPrices((prev) =>
+                        prev.map((x, i) => (i === idx ? { ...x, price_usd: safeNumber(e.target.value) } : x))
+                      )
+                    }
+                    inputMode="decimal"
+                    disabled={pricingSaving || !isEditingPricing}
+                  />
                 </div>
-              ) : !addOnsLoading ? (
-                <div className="text-sm text-muted-foreground">No add-ons yet. Click “Add Add-on”.</div>
-              ) : null}
-
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    setAddOns((prev) => [
-                      ...prev,
-                      {
-                        label: "",
-                        description: "",
-                        price_idr: 0,
-                        is_active: true,
-                        sort_order: prev.length,
-                      },
-                    ])
-                  }
-                  disabled={addOnsSaving || !isEditingAddOns}
-                >
-                  <Plus className="h-4 w-4 mr-2" /> Add Add-on
-                </Button>
-
-                <Button type="button" onClick={saveAddOns} disabled={addOnsSaving || !isEditingAddOns}>
-                  <Save className="h-4 w-4 mr-2" /> Save
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="domain">
-          <Card>
-            <CardHeader>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <CardTitle>Domain Pricing (TLD)</CardTitle>
-                  <CardDescription>Set per-TLD domain prices for /order/choose-domain.</CardDescription>
+                <div className="flex items-end justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setTldPrices((prev) => prev.filter((_, i) => i !== idx))}
+                    disabled={pricingSaving || !isEditingPricing || tldPrices.length <= 1}
+                    aria-label="Remove tld"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
-                <Badge variant="outline">Rows: {tldPrices.length}</Badge>
               </div>
-            </CardHeader>
+            ))
+          ) : !pricingLoading ? (
+            <div className="text-sm text-muted-foreground">No pricing rows yet.</div>
+          ) : null}
 
-            <CardContent className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-xs text-muted-foreground">
-                  {isEditingPricing ? "Edit mode: ON" : "Edit mode: OFF"}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setTldPrices((prev) => [...prev, { tld: "", price_usd: 0 }])}
+              disabled={pricingSaving || !isEditingPricing}
+            >
+              <Plus className="h-4 w-4 mr-2" /> Add TLD
+            </Button>
+            <Button type="button" onClick={saveDomainPricing} disabled={pricingSaving || !isEditingPricing}>
+              <Save className="h-4 w-4 mr-2" /> Save Pricing
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Website Plans - middle */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle>Website Plans</CardTitle>
+              <CardDescription>Manage “Choose plan duration” options on /order/subscription.</CardDescription>
+            </div>
+            <Badge variant="outline">Total: {plansCountLabel}</Badge>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs text-muted-foreground">{isEditingPlans ? "Edit mode: ON" : "Edit mode: OFF"}</div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEditingPlans((v) => !v)}
+              disabled={plansSaving}
+            >
+              {isEditingPlans ? "Cancel" : "Edit"}
+            </Button>
+          </div>
+
+          {plansLoading ? <div className="text-sm text-muted-foreground">Loading...</div> : null}
+
+          {!plansLoading && plans.length ? (
+            plans.map((p, idx) => (
+              <div key={`${p.years}-${idx}`} className="grid min-w-0 gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-12">
+                <div className="min-w-0 md:col-span-2">
+                  <Label className="text-xs">Years</Label>
+                  <Input
+                    className="w-full"
+                    value={String(p.years)}
+                    onChange={(e) =>
+                      setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, years: asNumber(e.target.value) } : x)))
+                    }
+                    inputMode="numeric"
+                    disabled={plansSaving || !isEditingPlans}
+                  />
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsEditingPricing((v) => !v)}
-                  disabled={pricingSaving}
-                >
-                  {isEditingPricing ? "Cancel" : "Edit"}
-                </Button>
+
+                <div className="min-w-0 md:col-span-4">
+                  <Label className="text-xs">Label</Label>
+                  <Input
+                    className="w-full"
+                    value={p.label}
+                    onChange={(e) => setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, label: e.target.value } : x)))}
+                    disabled={plansSaving || !isEditingPlans}
+                  />
+                </div>
+
+                <div className="min-w-0 md:col-span-3">
+                  <Label className="text-xs">Price (IDR)</Label>
+                  <Input
+                    className="w-full"
+                    value={String(p.price_usd ?? 0)}
+                    onChange={(e) =>
+                      setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, price_usd: asNumber(e.target.value, 0) } : x)))
+                    }
+                    inputMode="decimal"
+                    disabled={plansSaving || !isEditingPlans}
+                  />
+                </div>
+
+                <div className="min-w-0 md:col-span-2">
+                  <Label className="text-xs">Sort</Label>
+                  <Input
+                    className="w-full"
+                    value={String(p.sort_order)}
+                    onChange={(e) =>
+                      setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, sort_order: asNumber(e.target.value) } : x)))
+                    }
+                    inputMode="numeric"
+                    disabled={plansSaving || !isEditingPlans}
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 md:col-span-12">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={p.is_active ? "default" : "secondary"}>{p.is_active ? "On" : "Off"}</Badge>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setPlans((prev) => prev.map((x, i) => (i === idx ? { ...x, is_active: !x.is_active } : x)))}
+                      disabled={plansSaving || !isEditingPlans}
+                    >
+                      Toggle
+                    </Button>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setPlans((prev) => prev.filter((_, i) => i !== idx))}
+                    disabled={plansSaving || !isEditingPlans}
+                    aria-label="Remove plan"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
+            ))
+          ) : !plansLoading ? (
+            <div className="text-sm text-muted-foreground">No plans yet. Click “Add Plan”.</div>
+          ) : null}
 
-              {pricingLoading ? <div className="text-sm text-muted-foreground">Loading...</div> : null}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                setPlans((prev) => [
+                  ...prev,
+                  {
+                    years: 1,
+                    label: "1 Year",
+                    price_usd: 0,
+                    is_active: true,
+                    sort_order: prev.length ? Math.max(...prev.map((x) => x.sort_order)) + 1 : 1,
+                  },
+                ])
+              }
+              disabled={plansSaving || !isEditingPlans}
+            >
+              <Plus className="h-4 w-4 mr-2" /> Add Plan
+            </Button>
 
-              {!pricingLoading && tldPrices.length ? (
-                tldPrices.map((r, idx) => (
-                  <div key={`${r.tld}-${idx}`} className="grid gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-5">
-                    <div className="md:col-span-2">
-                      <Label className="text-xs">TLD</Label>
-                      <Input
-                        value={String(r.tld ?? "")}
-                        onChange={(e) => setTldPrices((prev) => prev.map((x, i) => (i === idx ? { ...x, tld: e.target.value } : x)))}
-                        placeholder="com"
-                        disabled={pricingSaving || !isEditingPricing}
+            <Button type="button" onClick={savePlans} disabled={plansSaving || !isEditingPlans}>
+              <Save className="h-4 w-4 mr-2" /> Save
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Add-ons - bottom */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle>Add-ons</CardTitle>
+              <CardDescription>Checklist add-ons yang tampil di bawah pilihan durasi pada /order/subscription.</CardDescription>
+            </div>
+            <Badge variant="outline">Total: {addOnsCountLabel}</Badge>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs text-muted-foreground">{isEditingAddOns ? "Edit mode: ON" : "Edit mode: OFF"}</div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEditingAddOns((v) => !v)}
+              disabled={addOnsSaving}
+            >
+              {isEditingAddOns ? "Cancel" : "Edit"}
+            </Button>
+          </div>
+
+          {addOnsLoading ? <div className="text-sm text-muted-foreground">Loading...</div> : null}
+
+          {!addOnsLoading && addOns.length ? (
+            <div className="space-y-3">
+              {addOns.map((a, idx) => (
+                <div key={a.id ?? `new-${idx}`} className="grid gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-12">
+                  <div className="md:col-span-3">
+                    <Label className="text-xs">Label</Label>
+                    <Input
+                      value={a.label}
+                      onChange={(e) => setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, label: e.target.value } : x)))}
+                      disabled={addOnsSaving || !isEditingAddOns}
+                      placeholder="e.g. Jasa Editing Website"
+                    />
+                  </div>
+
+                  <div className="md:col-span-4">
+                    <Label className="text-xs">Description</Label>
+                    <Textarea
+                      value={a.description}
+                      onChange={(e) => setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, description: e.target.value } : x)))}
+                      disabled={addOnsSaving || !isEditingAddOns}
+                      placeholder="Optional"
+                      rows={2}
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <Label className="text-xs">Price (IDR)</Label>
+                    <Input
+                      value={String(a.price_idr ?? 0)}
+                      onChange={(e) =>
+                        setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, price_idr: safeNumber(e.target.value) } : x)))
+                      }
+                      inputMode="numeric"
+                      disabled={addOnsSaving || !isEditingAddOns}
+                    />
+                  </div>
+
+                  <div className="md:col-span-1">
+                    <Label className="text-xs">Active</Label>
+                    <div className="pt-2">
+                      <Switch
+                        checked={Boolean(a.is_active)}
+                        onCheckedChange={(v) => setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, is_active: Boolean(v) } : x)))}
+                        disabled={addOnsSaving || !isEditingAddOns}
                       />
-                    </div>
-                    <div className="md:col-span-2">
-                      <Label className="text-xs">Price (IDR)</Label>
-                      <Input
-                        value={String(r.price_usd)}
-                        onChange={(e) =>
-                          setTldPrices((prev) => prev.map((x, i) => (i === idx ? { ...x, price_usd: safeNumber(e.target.value) } : x)))
-                        }
-                        inputMode="decimal"
-                        disabled={pricingSaving || !isEditingPricing}
-                      />
-                    </div>
-                    <div className="flex items-end justify-end">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setTldPrices((prev) => prev.filter((_, i) => i !== idx))}
-                        disabled={pricingSaving || !isEditingPricing || tldPrices.length <= 1}
-                        aria-label="Remove tld"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   </div>
-                ))
-              ) : !pricingLoading ? (
-                <div className="text-sm text-muted-foreground">No pricing rows yet.</div>
-              ) : null}
 
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setTldPrices((prev) => [...prev, { tld: "", price_usd: 0 }])}
-                  disabled={pricingSaving || !isEditingPricing}
-                >
-                  <Plus className="h-4 w-4 mr-2" /> Add TLD
-                </Button>
-                <Button type="button" onClick={saveDomainPricing} disabled={pricingSaving || !isEditingPricing}>
-                  <Save className="h-4 w-4 mr-2" /> Save Pricing
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                  <div className="md:col-span-1">
+                    <Label className="text-xs">Sort</Label>
+                    <Input
+                      value={String(a.sort_order ?? idx)}
+                      onChange={(e) =>
+                        setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, sort_order: asNumber(e.target.value, idx) } : x)))
+                      }
+                      inputMode="numeric"
+                      disabled={addOnsSaving || !isEditingAddOns}
+                    />
+                  </div>
+
+                  <div className="md:col-span-1 flex items-end justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={async () => {
+                        const id = String(a.id ?? "");
+                        setAddOns((prev) => prev.filter((_, i) => i !== idx));
+                        if (id) await deleteAddOn(id);
+                      }}
+                      disabled={addOnsSaving || !isEditingAddOns}
+                      aria-label="Remove add-on"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : !addOnsLoading ? (
+            <div className="text-sm text-muted-foreground">No add-ons yet. Click “Add Add-on”.</div>
+          ) : null}
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                setAddOns((prev) => [
+                  ...prev,
+                  {
+                    label: "",
+                    description: "",
+                    price_idr: 0,
+                    is_active: true,
+                    sort_order: prev.length,
+                  },
+                ])
+              }
+              disabled={addOnsSaving || !isEditingAddOns}
+            >
+              <Plus className="h-4 w-4 mr-2" /> Add Add-on
+            </Button>
+
+            <Button type="button" onClick={saveAddOns} disabled={addOnsSaving || !isEditingAddOns}>
+              <Save className="h-4 w-4 mr-2" /> Save
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
