@@ -33,7 +33,6 @@ const PUBLIC_PACKAGE_NAME_ORDER = [
 type PackagesCardsAlign = "left" | "center" | "right";
 const LAYOUT_SETTINGS_KEY = "packages_layout";
 
-
 function sanitizeAlign(value: unknown): PackagesCardsAlign {
   return value === "left" || value === "right" || value === "center" ? value : "center";
 }
@@ -48,6 +47,17 @@ function sortPackagesForPublic(p1: PackageRow, p2: PackageRow) {
   const bRank = bi === -1 ? Number.POSITIVE_INFINITY : bi;
   if (aRank !== bRank) return aRank - bRank;
   return a.localeCompare(b);
+}
+
+function formatIdr(price: number | null) {
+  if (price == null) return "—";
+  const n = typeof price === "number" ? price : Number(price);
+  if (!Number.isFinite(n)) return "—";
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(n);
 }
 
 export default function WebsitePackages() {
