@@ -1277,6 +1277,7 @@ export type Database = {
           is_active: boolean | null
           is_best_seller: boolean
           is_recommended: boolean
+          is_vip: boolean
           name: string
           price: number | null
           show_on_public: boolean
@@ -1290,6 +1291,7 @@ export type Database = {
           is_active?: boolean | null
           is_best_seller?: boolean
           is_recommended?: boolean
+          is_vip?: boolean
           name: string
           price?: number | null
           show_on_public?: boolean
@@ -1303,6 +1305,7 @@ export type Database = {
           is_active?: boolean | null
           is_best_seller?: boolean
           is_recommended?: boolean
+          is_vip?: boolean
           name?: string
           price?: number | null
           show_on_public?: boolean
