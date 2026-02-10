@@ -385,6 +385,7 @@ export default function Packages() {
                   const n = (pkg.name ?? "").trim().toLowerCase();
                   const type = (pkg.type ?? "").trim().toLowerCase();
                   const isCheckoutPlan = n === "growth" || n === "pro" || type === "growth" || type === "pro";
+                  const isGrowth = n === "growth" || type === "growth";
 
                   const to = isCheckoutPlan
                     ? `/order/select-plan?packageId=${encodeURIComponent(String(pkg.id))}`
@@ -416,23 +417,18 @@ export default function Packages() {
                             const baseFromPlan = Number(planMeta?.basePriceIdr ?? NaN);
                             const baseFallback = Number(pkg.price ?? 0);
 
-                            const isGrowth = n === "growth" || type === "growth";
-
                             // Growth & Pro packages are monthly-based in Duration Plan.
                             const isMonthlyBase = isCheckoutPlan;
 
+                            // base = price per month (monthly) OR price per year (yearly)
                             const base = Number.isFinite(baseFromPlan) && baseFromPlan > 0 ? baseFromPlan : baseFallback;
                             const years = Math.max(1, Number(planMeta?.years ?? 1));
-
-                            // For monthly-based plans: total = base_per_month * 12 * years
-                            // For yearly-based plans: total = base_per_year * years
-                            const normalTotal = isMonthlyBase ? Math.max(0, base * 12 * years) : Math.max(0, base * years);
 
                             const discountPercent = Number.isFinite(Number(planMeta?.discountPercent))
                               ? Number(planMeta?.discountPercent)
                               : Number(durationDiscountByPackageId[String(pkg.id)] ?? 0);
 
-                            const hasPlan = Boolean(planMeta) && normalTotal > 0;
+                            const hasPlan = Boolean(planMeta) && base > 0;
                             if (!hasPlan) {
                               return (
                                 <span className="text-4xl font-bold text-foreground">
@@ -441,15 +437,28 @@ export default function Packages() {
                               );
                             }
 
+                            // Manual override: treat as the final display price (per period)
                             const manualFinal = planMeta?.manualOverride ? (planMeta.overridePriceIdr ?? planMeta.finalPriceIdr) : null;
 
-                            const discountedTotal =
+                            const normalDisplay = isMonthlyBase ? Math.max(0, base) : Math.max(0, base * years);
+
+                            const discountedDisplay =
                               typeof manualFinal === "number" && Number.isFinite(manualFinal)
                                 ? Math.max(0, manualFinal)
-                                : Math.max(0, normalTotal * (1 - discountPercent / 100));
+                                : isMonthlyBase
+                                  ? Math.max(0, base * (1 - discountPercent / 100))
+                                  : Math.max(0, normalDisplay * (1 - discountPercent / 100));
 
-                            const suffix = isGrowth && years === 3 ? "/ 3 tahun" : "/ tahun";
-                            const afterLabel = isGrowth && years === 3 ? "Harga / 3 tahun setelah diskon" : "Harga / tahun setelah diskon";
+                            const suffix = isMonthlyBase ? "/ bulan" : isGrowth && years === 3 ? "/ 3 tahun" : "/ tahun";
+                            const afterLabel = isMonthlyBase
+                              ? "Harga / bulan setelah diskon"
+                              : isGrowth && years === 3
+                                ? "Harga / 3 tahun setelah diskon"
+                                : "Harga / tahun setelah diskon";
+
+                            const normalLabel = isMonthlyBase
+                              ? `Harga Normal / bulan: Rp ${normalDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`
+                              : `Harga Normal / tahun: Rp ${normalDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;
 
                             return (
                               <div className="space-y-2">
@@ -458,12 +467,12 @@ export default function Packages() {
                                   <span className="text-3xl md:text-4xl font-extrabold text-primary">{Math.round(discountPercent)}%</span>
                                 </div>
 
-                                <div className="text-sm text-muted-foreground line-through">
-                                  {isGrowth ? "Harga Dapat berubah sewaktu waktu" : `Harga Normal / tahun: Rp ${normalTotal.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`}
+                                <div className={isGrowth ? "text-sm text-muted-foreground" : "text-sm text-muted-foreground line-through"}>
+                                  {isGrowth ? "Harga Dapat berubah sewaktu waktu" : normalLabel}
                                 </div>
 
                                 <div className="text-4xl font-bold text-foreground">
-                                  Rp {discountedTotal.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                                  Rp {discountedDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
                                   <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">{suffix}</span>
                                 </div>
                                 <div className="text-xs text-muted-foreground">{afterLabel}</div>
