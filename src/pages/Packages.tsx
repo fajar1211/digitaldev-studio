@@ -110,8 +110,9 @@ export default function Packages() {
   const [packages, setPackages] = useState<PublicPackageWithAddOns[]>([]);
   const [startUrlsMap, setStartUrlsMap] = useState<Record<string, string>>({});
   const [durationDiscountByPackageId, setDurationDiscountByPackageId] = useState<Record<string, number>>({});
-  const [websiteOnlyYearBasePriceIdr, setWebsiteOnlyYearBasePriceIdr] = useState<number | null>(null);
-  const [websiteOnlyYearDiscountPercent, setWebsiteOnlyYearDiscountPercent] = useState<number | null>(null);
+  const [durationPlanYear1ByPackageId, setDurationPlanYear1ByPackageId] = useState<
+    Record<string, { basePriceIdr: number; discountPercent: number }>
+  >({});
   const [loading, setLoading] = useState(true);
 
   const justifyClass =
@@ -121,7 +122,7 @@ export default function Packages() {
     (async () => {
       const PACKAGES_START_URLS_FN = "packages-start-urls";
 
-      const [faqRes, pkgRes, addOnsRes, layoutRes, startUrlsRes, durationPlanRes] = await Promise.all([
+      const [faqRes, pkgRes, addOnsRes, layoutRes, startUrlsRes, legacyDurationPlanRes] = await Promise.all([
         supabase
           .from("website_faqs")
           .select("id,page,question,answer,sort_order,is_published,created_at,updated_at")
@@ -143,27 +144,23 @@ export default function Packages() {
           .order("created_at", { ascending: true }),
         (supabase as any).from("website_settings").select("value").eq("key", LAYOUT_SETTINGS_KEY).maybeSingle(),
         supabase.functions.invoke<{ ok: boolean; value?: Record<string, string> }>(PACKAGES_START_URLS_FN, { body: {} }),
+        // legacy global key (fallback only)
         (supabase as any).from("website_settings").select("value").eq("key", "order_subscription_plans").maybeSingle(),
       ]);
 
-      // Duration Plan base+discount (Years=1) — source of truth for Website Only / Tahun
-      try {
-        const v = (durationPlanRes as any)?.data?.value;
-        const list = Array.isArray(v) ? (v as any[]) : [];
+      const parseYear1Meta = (value: unknown) => {
+        const list = Array.isArray(value) ? (value as any[]) : [];
         const years1 = list.find((r) => Number(r?.years) === 1);
-
-        // Backward compatible: some rows may only have price_usd (legacy)
+        if (!years1) return null;
         const baseRaw = years1?.base_price_idr ?? years1?.override_price_idr ?? years1?.price_usd;
         const baseN = typeof baseRaw === "number" ? baseRaw : Number(baseRaw);
-        setWebsiteOnlyYearBasePriceIdr(Number.isFinite(baseN) ? baseN : null);
-
         const discRaw = years1?.discount_percent;
         const discN = typeof discRaw === "number" ? discRaw : Number(discRaw);
-        setWebsiteOnlyYearDiscountPercent(Number.isFinite(discN) ? discN : 0);
-      } catch {
-        setWebsiteOnlyYearBasePriceIdr(null);
-        setWebsiteOnlyYearDiscountPercent(null);
-      }
+        if (!Number.isFinite(baseN)) return null;
+        return { basePriceIdr: Math.max(0, baseN), discountPercent: Number.isFinite(discN) ? discN : 0 };
+      };
+
+      const legacyYear1 = parseYear1Meta((legacyDurationPlanRes as any)?.data?.value);
 
       if (!faqRes.error) setFaqs((faqRes.data ?? []) as FaqRow[]);
 
@@ -207,7 +204,41 @@ export default function Packages() {
 
         setPackages(withAddOns);
 
-        // Durations (for public price display)
+        // Duration Plan (Years=1) per package — source of truth for Harga Normal + Diskon% on /packages
+        try {
+          const pkgIds = withAddOns.map((p) => String(p.id));
+          const keys = pkgIds.map((id) => `order_subscription_plans:${id}`);
+
+          const { data: rows } = await (supabase as any)
+            .from("website_settings")
+            .select("key,value")
+            .in("key", keys);
+
+          const map: Record<string, { basePriceIdr: number; discountPercent: number }> = {};
+          if (Array.isArray(rows)) {
+            for (const r of rows as any[]) {
+              const key = String(r?.key ?? "");
+              const value = r?.value;
+              const pkgId = key.split(":")[1];
+              if (!pkgId) continue;
+              const meta = parseYear1Meta(value);
+              if (meta) map[pkgId] = meta;
+            }
+          }
+
+          // fallback: if a package doesn't have its own plans yet, use legacy global config (if present)
+          if (legacyYear1) {
+            for (const id of pkgIds) {
+              if (!map[id]) map[id] = legacyYear1;
+            }
+          }
+
+          setDurationPlanYear1ByPackageId(map);
+        } catch {
+          setDurationPlanYear1ByPackageId({});
+        }
+
+        // Durations (fallback only, kept for safety)
         try {
           const pkgIds = withAddOns.map((p) => String(p.id));
           if (pkgIds.length) {
@@ -314,43 +345,46 @@ export default function Packages() {
                         <CardDescription className="text-primary font-medium uppercase text-xs">{pkg.type}</CardDescription>
                         <CardTitle className="text-xl">{pkg.name}</CardTitle>
                         <div className="mt-4">
-                          {String(pkg.id) === WEBSITE_ONLY_YEARLY_PACKAGE_ID && durationDiscountByPackageId[String(pkg.id)] != null ? (
-                            (() => {
-                              const baseFromDurationPlan = websiteOnlyYearBasePriceIdr;
-                              const base = Number.isFinite(Number(baseFromDurationPlan)) && Number(baseFromDurationPlan) > 0
-                                ? Number(baseFromDurationPlan)
-                                : Number(pkg.price ?? 0);
+                          {(() => {
+                            const planMeta = durationPlanYear1ByPackageId[String(pkg.id)];
+                            const base = Number.isFinite(Number(planMeta?.basePriceIdr)) && Number(planMeta?.basePriceIdr) > 0
+                              ? Number(planMeta?.basePriceIdr)
+                              : Number(pkg.price ?? 0);
 
-                              const discountPercent = Number(
-                                websiteOnlyYearDiscountPercent != null ? websiteOnlyYearDiscountPercent : durationDiscountByPackageId[String(pkg.id)] ?? 0,
-                              );
-                              const discounted = Math.max(0, base * (1 - discountPercent / 100));
+                            const discountPercent = Number.isFinite(Number(planMeta?.discountPercent))
+                              ? Number(planMeta?.discountPercent)
+                              : Number(durationDiscountByPackageId[String(pkg.id)] ?? 0);
+
+                            const shouldShowDurationPlan = planMeta && Number(base) > 0;
+                            if (!shouldShowDurationPlan) {
                               return (
-                                <div className="space-y-2">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <span className="text-sm font-semibold text-primary">Diskon</span>
-                                    <span className="text-3xl md:text-4xl font-extrabold text-primary">
-                                      {Math.round(discountPercent)}%
-                                    </span>
-                                  </div>
-
-                                  <div className="text-sm text-muted-foreground line-through">
-                                    Harga Normal / tahun: Rp {base.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
-                                  </div>
-
-                                  <div className="text-4xl font-bold text-foreground">
-                                    Rp {discounted.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
-                                    <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">/ tahun</span>
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">Harga / tahun setelah diskon</div>
-                                </div>
+                                <span className="text-4xl font-bold text-foreground">
+                                  Rp {Number(pkg.price ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                                </span>
                               );
-                            })()
-                          ) : (
-                            <span className="text-4xl font-bold text-foreground">
-                              Rp {Number(pkg.price ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 0 })}
-                            </span>
-                          )}
+                            }
+
+                            const discounted = Math.max(0, base * (1 - discountPercent / 100));
+
+                            return (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-center gap-2">
+                                  <span className="text-sm font-semibold text-primary">Diskon</span>
+                                  <span className="text-3xl md:text-4xl font-extrabold text-primary">{Math.round(discountPercent)}%</span>
+                                </div>
+
+                                <div className="text-sm text-muted-foreground line-through">
+                                  Harga Normal / tahun: Rp {base.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                                </div>
+
+                                <div className="text-4xl font-bold text-foreground">
+                                  Rp {discounted.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                                  <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">/ tahun</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground">Harga / tahun setelah diskon</div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       </CardHeader>
                       <CardContent className="flex-1">
