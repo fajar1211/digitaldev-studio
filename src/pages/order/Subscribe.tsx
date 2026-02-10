@@ -26,10 +26,10 @@ export default function Subscribe() {
   const { state, setSubscriptionYears } = useOrder();
   const { subscriptionPlans, pricing, durationRows } = useOrderPublicSettings(state.domain, state.selectedPackageId);
 
-  const options = useMemo(() => {
-    const isMonthly = isMonthlyPackageName(state.selectedPackageName);
-    const monthlyBase = pricing.packagePriceUsd ?? null;
+  const isMonthly = useMemo(() => isMonthlyPackageName(state.selectedPackageName), [state.selectedPackageName]);
+  const monthlyBase = pricing.packagePriceUsd ?? null;
 
+  const options = useMemo(() => {
     if (isMonthly && monthlyBase != null) {
       const discountByMonths = new Map<number, number>();
       for (const r of durationRows || []) {
@@ -45,6 +45,8 @@ export default function Subscribe() {
         const priceIdr = computeDiscountedTotal({ monthlyPrice: monthlyBase, months, discountPercent });
         return {
           years,
+          months,
+          discountPercent,
           label: `Durasi ${years} Tahun`,
           priceIdr,
           isActive: true,
@@ -72,7 +74,7 @@ export default function Subscribe() {
       })
       .filter((opt) => opt.years > 0 && opt.isActive)
       .sort((a, b) => a.sortOrder - b.sortOrder);
-  }, [durationRows, pricing.packagePriceUsd, state.selectedPackageName, subscriptionPlans]);
+  }, [durationRows, isMonthly, monthlyBase, subscriptionPlans]);
 
   const selected = state.subscriptionYears;
 
@@ -116,6 +118,12 @@ export default function Subscribe() {
                         <div>
                           <p className="text-base font-semibold text-foreground">{finalLabel}</p>
                           <p className="mt-1 text-sm text-muted-foreground">All-in</p>
+                          {isMonthly && monthlyBase != null && (opt as any)?.months ? (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Otomatis dihitung: {formatIdr(monthlyBase)} / bulan × {(opt as any).months} bulan (12 × {opt.years} tahun)
+                              {(opt as any).discountPercent ? ` lalu diskon ${(opt as any).discountPercent}%` : ""}.
+                            </p>
+                          ) : null}
                         </div>
                         {isSelected ? <Badge variant="secondary">Dipilih</Badge> : <Badge variant="outline">Plan</Badge>}
                       </div>
