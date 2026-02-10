@@ -35,6 +35,8 @@ type PackageRow = {
   is_active?: boolean | null;
   show_on_public?: boolean | null;
   is_recommended?: boolean | null;
+  is_best_seller?: boolean | null;
+  is_vip?: boolean | null;
   created_at?: string | null;
 };
 
@@ -415,12 +417,16 @@ export default function Packages() {
                       className="relative flex w-full max-w-sm flex-col shadow-soft animate-fade-in sm:basis-[calc(50%-1rem)] lg:basis-[calc(33.333%-1.34rem)]"
                       style={{ animationDelay: `${i * 0.1}s` }}
                     >
-                      {!!pkg.is_recommended && (
-                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                          <Badge variant="default" className="gap-1">
-                            <Star className="h-3.5 w-3.5" />
-                            {t("packages.recommended")}
-                          </Badge>
+                      {(!!pkg.is_recommended || !!pkg.is_best_seller || !!pkg.is_vip) && (
+                        <div className="absolute -top-3 left-1/2 flex -translate-x-1/2 flex-wrap items-center justify-center gap-2">
+                          {!!pkg.is_recommended && (
+                            <Badge variant="default" className="gap-1">
+                              <Star className="h-3.5 w-3.5" />
+                              {t("packages.recommended")}
+                            </Badge>
+                          )}
+                          {!!pkg.is_best_seller && <Badge variant="secondary">Best Seller</Badge>}
+                          {!!pkg.is_vip && <Badge variant="outline">VIP</Badge>}
                         </div>
                       )}
                       <CardHeader className="text-center pb-4">
