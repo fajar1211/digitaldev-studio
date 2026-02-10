@@ -48,6 +48,12 @@ type SubscriptionAddOnRow = {
   sort_order: number;
 };
 
+type DomainTldPriceDraft = {
+  id?: string;
+  tld: string;
+  price_usd: number;
+};
+
 const SETTINGS_SUBSCRIPTION_PLANS_KEY = "order_subscription_plans";
 
 // Keep ordering consistent with /dashboard/super-admin/all-packages
@@ -122,6 +128,11 @@ export default function SuperAdminSubscriptions() {
   const [addOnsSaving, setAddOnsSaving] = useState(false);
   const [isEditingAddOns, setIsEditingAddOns] = useState(false);
   const [addOns, setAddOns] = useState<SubscriptionAddOnRow[]>([]);
+
+  const [domainPricesLoading, setDomainPricesLoading] = useState(false);
+  const [domainPricesSaving, setDomainPricesSaving] = useState(false);
+  const [isEditingDomainPrices, setIsEditingDomainPrices] = useState(false);
+  const [domainTldPrices, setDomainTldPrices] = useState<DomainTldPriceDraft[]>([]);
 
   const syncPackageIdToUrl = (nextId: string) => {
     const sp = new URLSearchParams(searchParams);
@@ -339,6 +350,112 @@ export default function SuperAdminSubscriptions() {
     }
   };
 
+  const fetchDomainTldPrices = async (packageId: string) => {
+    setDomainPricesLoading(true);
+    try {
+      if (!packageId) {
+        setDomainTldPrices([]);
+        return;
+      }
+
+      const { data, error } = await (supabase as any)
+        .from("domain_tld_prices")
+        .select("id,tld,price_usd")
+        .eq("package_id", packageId)
+        .order("tld", { ascending: true });
+      if (error) throw error;
+
+      const rows = Array.isArray(data)
+        ? (data as any[])
+            .map((r) => ({
+              id: String(r.id),
+              tld: String(r.tld ?? "").trim(),
+              price_usd: asNumber(r.price_usd, 0),
+            }))
+            .filter((r) => r.tld)
+        : [];
+
+      setDomainTldPrices(rows);
+    } catch (e: any) {
+      console.error(e);
+      const msg = e?.message || "Failed to load domain pricing";
+      if (String(msg).toLowerCase().includes("unauthorized")) {
+        navigate("/super-admin/login", { replace: true });
+        return;
+      }
+      toast({ variant: "destructive", title: "Error", description: msg });
+      setDomainTldPrices([]);
+    } finally {
+      setDomainPricesLoading(false);
+    }
+  };
+
+  const saveDomainTldPrices = async () => {
+    setDomainPricesSaving(true);
+    try {
+      const normalized = (domainTldPrices ?? [])
+        .map((r) => ({
+          id: r.id,
+          package_id: pricingPackageId,
+          tld: String(r.tld ?? "")
+            .trim()
+            .toLowerCase()
+            .replace(/^\./, ""),
+          price_usd: Math.max(0, Math.floor(asNumber(r.price_usd, 0))),
+        }))
+        .filter((r) => r.tld);
+
+      const invalid = normalized.find((r) => !r.tld);
+      if (invalid) {
+        toast({ variant: "destructive", title: "Save failed", description: "TLD wajib diisi." });
+        return;
+      }
+
+      const dupCheck = new Set<string>();
+      for (const row of normalized) {
+        if (dupCheck.has(row.tld)) {
+          toast({ variant: "destructive", title: "Save failed", description: `TLD duplikat: .${row.tld}` });
+          return;
+        }
+        dupCheck.add(row.tld);
+      }
+
+      const toUpsert = normalized.filter((r: any) => Boolean(r.id)).map((r: any) => ({ ...r, id: r.id }));
+      const toInsert = normalized.filter((r: any) => !r.id).map(({ id, ...rest }: any) => rest);
+
+      if (toInsert.length) {
+        const { error } = await (supabase as any).from("domain_tld_prices").insert(toInsert);
+        if (error) throw error;
+      }
+
+      if (toUpsert.length) {
+        const { error } = await (supabase as any).from("domain_tld_prices").upsert(toUpsert, { onConflict: "id" });
+        if (error) throw error;
+      }
+
+      toast({ title: "Saved", description: "Harga domain berhasil disimpan." });
+      setIsEditingDomainPrices(false);
+      await fetchDomainTldPrices(pricingPackageId);
+    } catch (e: any) {
+      console.error(e);
+      toast({ variant: "destructive", title: "Failed to save", description: e?.message ?? "Unknown error" });
+    } finally {
+      setDomainPricesSaving(false);
+    }
+  };
+
+  const deleteDomainTldRow = async (id: string) => {
+    try {
+      const { error } = await (supabase as any).from("domain_tld_prices").delete().eq("id", id);
+      if (error) throw error;
+      toast({ title: "Deleted", description: "Harga domain dihapus." });
+      await fetchDomainTldPrices(pricingPackageId);
+    } catch (e: any) {
+      console.error(e);
+      toast({ variant: "destructive", title: "Failed to delete", description: e?.message ?? "Unknown error" });
+    }
+  };
+
   useEffect(() => {
     fetchPackages();
     fetchPlans();
@@ -347,9 +464,19 @@ export default function SuperAdminSubscriptions() {
 
   useEffect(() => {
     if (!pricingPackageId) return;
+
     fetchAddOns(pricingPackageId);
+
+    const selectedName = packages.find((p) => p.id === pricingPackageId)?.name ?? "";
+    const shouldShowDomainPricing = isWebsiteOnlyYearlyPackageName(selectedName);
+    if (shouldShowDomainPricing) {
+      fetchDomainTldPrices(pricingPackageId);
+    } else {
+      setDomainTldPrices([]);
+      setIsEditingDomainPrices(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pricingPackageId]);
+  }, [pricingPackageId, packages]);
 
   const normalizePackageName = (name: string) =>
     String(name ?? "")
@@ -366,6 +493,12 @@ export default function SuperAdminSubscriptions() {
     const isBlogSocmed = n.includes("blog + social media") || n.includes("blog+social media");
 
     return isFdm || isBlogSocmed;
+  };
+
+  const isWebsiteOnlyYearlyPackageName = (name: string) => {
+    const n = normalizePackageName(name);
+    // KHUSUS: hanya menu Website Only /Tahun
+    return n.includes("website only") && n.includes("tahun");
   };
 
   const isMonthlyBaseForPlans = () => {
@@ -496,6 +629,10 @@ export default function SuperAdminSubscriptions() {
     return isMonthlyBasePackageName(selectedPackageName);
   }, [selectedPackageName]);
 
+  const isWebsiteOnlyYearly = useMemo(() => {
+    return isWebsiteOnlyYearlyPackageName(selectedPackageName);
+  }, [selectedPackageName]);
+
   const planAutoOpts = useMemo(() => ({ isMonthlyBase: isMarketingPackage }), [isMarketingPackage]);
 
   return (
@@ -534,10 +671,121 @@ export default function SuperAdminSubscriptions() {
             </Tabs>
           )}
         </CardContent>
-      </Card>
+       </Card>
 
-      {/* Duration Plan - middle */}
-      {!isMarketingPackage ? (
+       {/* Harga Domain (hanya untuk Website Only /Tahun) */}
+       {isWebsiteOnlyYearly ? (
+         <Card>
+           <CardHeader>
+             <div className="flex items-start justify-between gap-3">
+               <div>
+                 <CardTitle>Harga Domain</CardTitle>
+                 <CardDescription>Harga TLD yang ditampilkan di /order/choose-domain (khusus paket Website Only /Tahun).</CardDescription>
+               </div>
+               <Badge variant="outline">Total: {String(domainTldPrices.length)}</Badge>
+             </div>
+           </CardHeader>
+
+           <CardContent className="space-y-3">
+             <div className="flex flex-wrap items-center justify-between gap-2">
+               <div className="text-xs text-muted-foreground">
+                 {isEditingDomainPrices ? "Edit mode: ON" : "Edit mode: OFF"}
+               </div>
+               <Button
+                 type="button"
+                 variant="outline"
+                 size="sm"
+                 onClick={() => setIsEditingDomainPrices((v) => !v)}
+                 disabled={domainPricesSaving}
+               >
+                 {isEditingDomainPrices ? "Cancel" : "Edit"}
+               </Button>
+             </div>
+
+             {domainPricesLoading ? <div className="text-sm text-muted-foreground">Loading...</div> : null}
+
+             {!domainPricesLoading && domainTldPrices.length ? (
+               <div className="space-y-3">
+                 {domainTldPrices.map((row, idx) => (
+                   <div key={row.id ?? `new-${idx}`} className="grid gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-12">
+                     <div className="md:col-span-5">
+                       <Label className="text-xs">TLD</Label>
+                       <Input
+                         value={row.tld}
+                         onChange={(e) =>
+                           setDomainTldPrices((prev) => prev.map((x, i) => (i === idx ? { ...x, tld: e.target.value } : x)))
+                         }
+                         disabled={domainPricesSaving || !isEditingDomainPrices}
+                         placeholder="com"
+                       />
+                       <div className="mt-1 text-[11px] text-muted-foreground">Tulis tanpa titik (contoh: com, id, co.id).</div>
+                     </div>
+
+                     <div className="md:col-span-5">
+                       <Label className="text-xs">Harga (IDR)</Label>
+                       <Input
+                         value={String(row.price_usd ?? 0)}
+                         onChange={(e) =>
+                           setDomainTldPrices((prev) =>
+                             prev.map((x, i) => (i === idx ? { ...x, price_usd: asNumber(e.target.value, 0) } : x)),
+                           )
+                         }
+                         inputMode="numeric"
+                         disabled={domainPricesSaving || !isEditingDomainPrices}
+                       />
+                     </div>
+
+                     <div className="md:col-span-2 flex items-end justify-end">
+                       <Button
+                         type="button"
+                         variant="outline"
+                         size="icon"
+                         onClick={async () => {
+                           const id = String(row.id ?? "");
+                           setDomainTldPrices((prev) => prev.filter((_, i) => i !== idx));
+                           if (id) await deleteDomainTldRow(id);
+                         }}
+                         disabled={domainPricesSaving || !isEditingDomainPrices}
+                         aria-label="Remove TLD"
+                       >
+                         <Trash2 className="h-4 w-4" />
+                       </Button>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             ) : !domainPricesLoading ? (
+               <div className="text-sm text-muted-foreground">Belum ada harga domain. Klik “Add TLD”.</div>
+             ) : null}
+
+             <div className="flex flex-wrap gap-2">
+               <Button
+                 type="button"
+                 variant="outline"
+                 onClick={() =>
+                   setDomainTldPrices((prev) => [
+                     ...prev,
+                     {
+                       tld: "",
+                       price_usd: 0,
+                     },
+                   ])
+                 }
+                 disabled={domainPricesSaving || !isEditingDomainPrices}
+               >
+                 <Plus className="h-4 w-4 mr-2" /> Add TLD
+               </Button>
+
+               <Button type="button" onClick={saveDomainTldPrices} disabled={domainPricesSaving || !isEditingDomainPrices}>
+                 <Save className="h-4 w-4 mr-2" /> Save
+               </Button>
+             </div>
+           </CardContent>
+         </Card>
+       ) : null}
+
+       {/* Duration Plan - middle */}
+       {!isMarketingPackage ? (
         <Card>
           <CardHeader>
             <div className="flex items-start justify-between gap-3">
