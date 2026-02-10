@@ -298,10 +298,18 @@ export default function Packages() {
                               const discountPercent = Number(durationDiscountByPackageId[String(pkg.id)] ?? 0);
                               const discounted = Math.max(0, base * (1 - discountPercent / 100));
                               return (
-                                <div className="space-y-1">
-                                  <div className="text-sm text-muted-foreground line-through">
-                                    Harga dasar / tahun: Rp {base.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <span className="text-sm font-semibold text-primary">Diskon</span>
+                                    <span className="text-3xl md:text-4xl font-extrabold text-primary">
+                                      {Math.round(discountPercent)}%
+                                    </span>
                                   </div>
+
+                                  <div className="text-sm text-muted-foreground line-through">
+                                    Harga Normal / tahun: Rp {base.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                                  </div>
+
                                   <div className="text-4xl font-bold text-foreground">
                                     Rp {discounted.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
                                     <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">/ tahun</span>
