@@ -227,7 +227,26 @@ export default function PackageOnboardingSettingsPanel({ packageId }: { packageI
               <div className="space-y-3 rounded-lg border border-border p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h3 className="text-base font-semibold text-foreground">Duration & Discount</h3>
+                    {(() => {
+                      const n = String(pkg?.name ?? "")
+                        .toLowerCase()
+                        .replace(/\s+/g, " ")
+                        .trim();
+                      const isMarketingMonthly =
+                        n.includes("full digital marketing") || n.includes("blog + social media") || n.includes("blog+social media");
+
+                      return (
+                        <h3
+                          className={
+                            isMarketingMonthly
+                              ? "text-2xl font-semibold leading-none tracking-tight"
+                              : "text-base font-semibold text-foreground"
+                          }
+                        >
+                          Duration & Discount
+                        </h3>
+                      );
+                    })()}
                     <p className="text-xs text-muted-foreground">Opsi durasi untuk onboarding (diskon dari total harga normal per bulan).</p>
                   </div>
 
