@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Award, Check, Crown, Star } from "lucide-react";
 
@@ -13,6 +13,7 @@ import { FaqAnswer } from "@/components/faq/FaqAnswer";
 import heroPackages from "@/assets/hero-packages.jpg";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { useI18n } from "@/hooks/useI18n";
+import { useSupabaseRealtimeReload } from "@/hooks/useSupabaseRealtimeReload";
 
 type FaqRow = {
   id: string;
@@ -130,8 +131,9 @@ export default function Packages() {
   const justifyClass =
     cardsAlign === "left" ? "justify-start" : cardsAlign === "right" ? "justify-end" : "justify-center";
 
-  useEffect(() => {
-    (async () => {
+  const fetchPublicPackagesData = useCallback(async () => {
+    setLoading(true);
+    try {
       const PACKAGES_START_URLS_FN = "packages-start-urls";
 
       const [faqRes, pkgRes, addOnsRes, layoutRes, startUrlsRes, legacyDurationPlanRes] = await Promise.all([
@@ -210,8 +212,8 @@ export default function Packages() {
 
       if (!faqRes.error) setFaqs((faqRes.data ?? []) as FaqRow[]);
 
-      const map = (startUrlsRes as any)?.data?.value;
-      setStartUrlsMap(map && typeof map === "object" ? (map as any) : {});
+      const startUrlsValue = (startUrlsRes as any)?.data?.value;
+      setStartUrlsMap(startUrlsValue && typeof startUrlsValue === "object" ? (startUrlsValue as any) : {});
 
       const addOnsByPackageId = new Map<string, PackageAddOnRow[]>();
       if (addOnsRes?.data) {
@@ -255,19 +257,16 @@ export default function Packages() {
         try {
           const pkgIds = withAddOns.map((p) => String(p.id));
           const pkgYearsWanted: Record<string, number> = {};
-            for (const p of withAddOns) {
-              const n = String(p.name ?? "").trim().toLowerCase();
-              const t = String(p.type ?? "").trim().toLowerCase();
-              const isMarketing3y = n === "growth" || t === "growth" || n === "pro" || t === "pro";
-              pkgYearsWanted[String(p.id)] = isMarketing3y ? 3 : 1;
-            }
+          for (const p of withAddOns) {
+            const n = String(p.name ?? "").trim().toLowerCase();
+            const t = String(p.type ?? "").trim().toLowerCase();
+            const isMarketing3y = n === "growth" || t === "growth" || n === "pro" || t === "pro";
+            pkgYearsWanted[String(p.id)] = isMarketing3y ? 3 : 1;
+          }
 
           const keys = pkgIds.map((id) => `order_subscription_plans:${id}`);
 
-          const { data: rows } = await (supabase as any)
-            .from("website_settings")
-            .select("key,value")
-            .in("key", keys);
+          const { data: rows } = await (supabase as any).from("website_settings").select("key,value").in("key", keys);
 
           const map: Record<
             string,
@@ -357,10 +356,26 @@ export default function Packages() {
           setCardsAlign(nextAlign);
         }
       }
-
+    } finally {
       setLoading(false);
-    })();
+    }
   }, []);
+
+  useEffect(() => {
+    void fetchPublicPackagesData();
+  }, [fetchPublicPackagesData]);
+
+  useSupabaseRealtimeReload({
+    channelName: "public-packages-sync",
+    targets: [
+      { table: "website_settings" },
+      { table: "package_durations" },
+      { table: "packages" },
+      { table: "package_add_ons" },
+    ],
+    debounceMs: 500,
+    onChange: fetchPublicPackagesData,
+  });
 
   const fallbackFaqs = useMemo(
     () => [
@@ -495,19 +510,19 @@ export default function Packages() {
                                   ? Math.max(0, base * (1 - discountPercent / 100))
                                   : Math.max(0, normalDisplay * (1 - discountPercent / 100));
 
-                            // For monthly marketing packages, the main headline should reflect "Harga Normal / Bulan"
-                            // as configured in Duration Plan.
-                            const headlineDisplay = isMonthlyBase ? normalDisplay : discountedDisplay;
+                            // For monthly marketing packages, show discounted price per month as headline,
+                            // with the normal monthly price struck through.
+                            const headlineDisplay = discountedDisplay;
 
                             const suffix = isMonthlyBase ? "/bulan" : isGrowth && years === 3 ? "/ 3 tahun" : "/ tahun";
                             const afterLabel = isMonthlyBase
-                              ? "Harga Normal / Bulan"
+                              ? "Harga setelah diskon / bulan"
                               : isGrowth && years === 3
                                 ? "Harga / 3 tahun setelah diskon"
                                 : "Harga / tahun setelah diskon";
 
                             const normalLabel = isMonthlyBase
-                              ? `Harga Normal / bulan: Rp ${normalDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`
+                              ? `Harga Normal / Bulan: ${normalDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`
                               : `Harga Normal / tahun: Rp ${normalDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;
 
                             return (
@@ -519,9 +534,7 @@ export default function Packages() {
                                   <span className="text-3xl md:text-4xl font-extrabold text-primary">{Math.round(discountPercent)}%</span>
                                 </div>
 
-                                <div className={isGrowth || isPro ? "text-sm text-muted-foreground" : "text-sm text-muted-foreground line-through"}>
-                                  {isGrowth || isPro ? "Harga Dapat berubah sewaktu waktu" : normalLabel}
-                                </div>
+                                <div className="text-sm text-muted-foreground line-through">{normalLabel}</div>
 
                                 <div className="text-4xl font-bold text-foreground">
                                   Rp {headlineDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
