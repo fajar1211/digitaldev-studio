@@ -33,7 +33,9 @@ export default function Billing() {
   const { rows: durationRows } = usePackageDurations(effectivePackageId);
   const { total: packageAddOnsTotal } = useOrderAddOns({ packageId: effectivePackageId, quantities: state.addOns ?? {} });
   const { total: subscriptionAddOnsTotal } = useSubscriptionAddOns({ selected: state.subscriptionAddOns ?? {}, packageId: effectivePackageId });
-  const addOnsTotal = packageAddOnsTotal + subscriptionAddOnsTotal;
+
+  const durationMonths = state.subscriptionYears ? Number(state.subscriptionYears) * 12 : 1;
+  const addOnsTotal = (packageAddOnsTotal + subscriptionAddOnsTotal) * durationMonths;
 
   const [promo, setPromo] = useState(state.promoCode);
   const [paying, setPaying] = useState(false);

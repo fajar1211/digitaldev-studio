@@ -49,7 +49,9 @@ export function OrderSummaryCard({
     selected: state.subscriptionAddOns ?? {},
     packageId: effectivePackageId,
   });
-  const addOnsTotal = packageAddOnsTotal + subscriptionAddOnsTotal;
+
+  const addOnsMultiplier = isMonthlyPackageName(state.selectedPackageName) && state.subscriptionYears ? Number(state.subscriptionYears) * 12 : 1;
+  const addOnsTotal = (packageAddOnsTotal + subscriptionAddOnsTotal) * addOnsMultiplier;
 
   const formatIdr = (value: number) => {
     return `Rp ${Math.round(value).toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;
@@ -163,7 +165,7 @@ export function OrderSummaryCard({
       for (const a of packageAddOnItems || []) {
         const qty = Number(state.addOns?.[a.id] ?? 0);
         if (!Number.isFinite(qty) || qty <= 0) continue;
-        const subtotal = Number(a.price_per_unit ?? 0) * qty;
+        const subtotal = Number(a.price_per_unit ?? 0) * qty * addOnsMultiplier;
         lines.push({
           key: `pkg-${a.id}`,
           label: `${a.label}${qty > 1 ? ` × ${qty}` : ""}`,
@@ -176,7 +178,7 @@ export function OrderSummaryCard({
         lines.push({
           key: `sub-${a.id}`,
           label: a.label,
-          price: Number(a.price_idr ?? 0),
+          price: Number(a.price_idr ?? 0) * addOnsMultiplier,
         });
       }
 

@@ -23,6 +23,8 @@ export function OrderPackageAddOns() {
 
   const { loading, items, total } = useOrderAddOns({ packageId: pkgId, quantities });
 
+  const durationMonths = state.subscriptionYears ? Number(state.subscriptionYears) * 12 : 1;
+
   const hasAnySelection = useMemo(() => Object.values(quantities).some((q) => (Number(q) ?? 0) > 0), [quantities]);
 
   if (!pkgId) return null;
@@ -75,7 +77,7 @@ export function OrderPackageAddOns() {
                   {current > 0 ? (
                     <div className="mt-3 flex items-center justify-between gap-3">
                       <p className="text-sm text-muted-foreground">
-                        Subtotal: <span className="font-medium text-foreground">{formatIdr(Number(a.price_per_unit ?? 0) * current)}</span>
+                        Subtotal: <span className="font-medium text-foreground">{formatIdr(Number(a.price_per_unit ?? 0) * current * durationMonths)}</span>
                       </p>
                       <Button type="button" variant="link" className="px-0" onClick={clear}>
                         Hapus
@@ -91,7 +93,7 @@ export function OrderPackageAddOns() {
         {items.length ? (
           <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/30 p-3">
             <span className="text-sm text-muted-foreground">Total add-ons</span>
-            <span className="text-sm font-semibold text-foreground">{formatIdr(total)}</span>
+            <span className="text-sm font-semibold text-foreground">{formatIdr(total * durationMonths)}</span>
           </div>
         ) : null}
 
