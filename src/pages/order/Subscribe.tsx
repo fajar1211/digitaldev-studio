@@ -17,9 +17,12 @@ function formatIdr(value: number) {
 }
 
 function isMonthlyPackageName(name: string | null) {
-  const n = String(name ?? "").toLowerCase().trim();
+  const n = String(name ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
   // Accept variants with suffix like "/bulan" or extra spaces.
-  return n.includes("full digital marketing") || n.includes("blog + social media");
+  return n.includes("full digital marketing") || n.includes("blog + social media") || n.includes("blog+social media");
 }
 
 export default function Subscribe() {

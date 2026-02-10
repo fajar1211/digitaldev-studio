@@ -5,7 +5,17 @@ import { useOrder } from "@/contexts/OrderContext";
 import { useOrderPublicSettings } from "@/hooks/useOrderPublicSettings";
 import { useOrderAddOns } from "@/hooks/useOrderAddOns";
 import { useSubscriptionAddOns } from "@/hooks/useSubscriptionAddOns";
+import { usePackageDurations } from "@/hooks/usePackageDurations";
 import { useI18n } from "@/hooks/useI18n";
+import { computeDiscountedTotal } from "@/lib/packageDurations";
+
+function isMonthlyPackageName(name: string | null) {
+  const n = String(name ?? "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+  return n.includes("full digital marketing") || n.includes("blog + social media") || n.includes("blog+social media");
+}
 
 export function OrderSummaryCard({
   showEstPrice = true,
@@ -27,8 +37,12 @@ export function OrderSummaryCard({
   const { t, lang } = useI18n();
   const { state } = useOrder();
   const { contact, subscriptionPlans, pricing } = useOrderPublicSettings(state.domain, state.selectedPackageId);
-  const { total: packageAddOnsTotal } = useOrderAddOns({ packageId: state.selectedPackageId, quantities: state.addOns ?? {} });
-  const { total: subscriptionAddOnsTotal } = useSubscriptionAddOns({ selected: state.subscriptionAddOns ?? {}, packageId: state.selectedPackageId });
+
+  const effectivePackageId = state.selectedPackageId ?? pricing.defaultPackageId ?? null;
+  const { rows: durationRows } = usePackageDurations(effectivePackageId);
+
+  const { total: packageAddOnsTotal } = useOrderAddOns({ packageId: effectivePackageId, quantities: state.addOns ?? {} });
+  const { total: subscriptionAddOnsTotal } = useSubscriptionAddOns({ selected: state.subscriptionAddOns ?? {}, packageId: effectivePackageId });
   const addOnsTotal = packageAddOnsTotal + subscriptionAddOnsTotal;
 
   const formatIdr = (value: number) => {
@@ -64,10 +78,34 @@ export function OrderSummaryCard({
       : `${state.subscriptionYears} year(s)`
     : "—";
 
+  const isMonthly = isMonthlyPackageName(state.selectedPackageName);
+
+  const discountByMonths = (() => {
+    const m = new Map<number, number>();
+    for (const r of durationRows || []) {
+      if ((r as any)?.is_active === false) continue;
+      const months = Number((r as any)?.duration_months ?? 0);
+      const discount = Number((r as any)?.discount_percent ?? 0);
+      if (Number.isFinite(months) && months > 0) m.set(months, discount);
+    }
+    return m;
+  })();
+
   const durationPriceIdr = (() => {
     if (!showEstPrice) return null;
     if (!state.subscriptionYears) return null;
 
+    // Paket bulanan (marketing): total mengikuti perhitungan /order/subscribe (harga /bulan × bulan, lalu diskon)
+    if (isMonthly) {
+      const monthlyBase = Number(pricing?.packagePriceUsd ?? 0);
+      if (!Number.isFinite(monthlyBase) || monthlyBase <= 0) return null;
+
+      const months = Number(state.subscriptionYears) * 12;
+      const discountPercent = discountByMonths.get(months) ?? 0;
+      return computeDiscountedTotal({ monthlyPrice: monthlyBase, months, discountPercent });
+    }
+
+    // Paket non-bulanan: ambil dari website_settings.order_subscription_plans
     const selectedPlan = (subscriptionPlans || []).find((p: any) => Number(p?.years) === Number(state.subscriptionYears));
     const v = Number((selectedPlan as any)?.price_usd ?? 0);
     return Number.isFinite(v) && v > 0 ? v : null;
@@ -82,7 +120,6 @@ export function OrderSummaryCard({
 
     return durationOnly + addOnsTotal;
   })();
-
 
   const promoDiscountUsd = (() => {
     const d = state.appliedPromo?.discountUsd ?? 0;
@@ -102,11 +139,6 @@ export function OrderSummaryCard({
   })();
 
   const effectiveEstTotalLabel = estTotalLabel ?? "—";
-
-  const isMonthly = (() => {
-    const n = String(state.selectedPackageName ?? "").toLowerCase().trim();
-    return n.includes("full digital marketing") || n.includes("blog + social media");
-  })();
 
   const perMonthLabel = lang === "id" ? "Harga /Bulan" : "Price /Month";
   const totalLabel = lang === "id" ? "Total Harga" : "Total";
