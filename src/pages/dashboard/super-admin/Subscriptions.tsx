@@ -865,6 +865,12 @@ export default function SuperAdminSubscriptions() {
                 );
                 const isManual = p.manual_override === true;
 
+                const years = Math.max(0.5, asNumber(p.years, 1));
+                const months = Math.max(1, Math.round(years * 12));
+                const finalPrice = asNumber(isManual ? p.override_price_idr ?? p.price_usd ?? 0 : autoPrice, 0);
+                const perMonth = months ? Math.round(finalPrice / months) : 0;
+                const showPerMonth = years >= 1 && years <= 3;
+
                 return (
                   <div key={`${p.years}-${idx}`} className="grid min-w-0 gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-12">
                     <div className="min-w-0 md:col-span-2">
@@ -947,6 +953,12 @@ export default function SuperAdminSubscriptions() {
                             inputMode="decimal"
                             disabled={plansSaving || !isEditingPlans || !isManual}
                           />
+
+                          {showPerMonth ? (
+                            <div className="mt-1 text-[11px] text-muted-foreground">
+                              ≈ Rp {perMonth.toLocaleString("id-ID", { maximumFractionDigits: 0 })} / bulan
+                            </div>
+                          ) : null}
                         </div>
                       </div>
 
