@@ -513,7 +513,9 @@ export default function Packages() {
                             return (
                               <div className="space-y-2">
                                 <div className="flex items-center justify-center gap-2">
-                                  <span className="text-sm font-semibold text-primary">Diskon</span>
+                                  <span className="text-sm font-semibold text-primary">
+                                    {isGrowth || isPro ? "Diskon Hingga" : "Diskon"}
+                                  </span>
                                   <span className="text-3xl md:text-4xl font-extrabold text-primary">{Math.round(discountPercent)}%</span>
                                 </div>
 
