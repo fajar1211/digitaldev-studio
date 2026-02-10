@@ -6,7 +6,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import PackageCard from '@/components/onboarding/PackageCard';
-import { growingPackages, type GrowingPackage } from '@/data/growingPackages';
 import { buildDurationOptionsFromDb, computeDiscountedTotal, type PackageDurationRow } from '@/lib/packageDurations';
 
   type DbAddOn = {
@@ -24,7 +23,7 @@ type DbDuration = PackageDurationRow;
 interface Package {
   id: string;
   name: string;
-  type: 'starter' | 'growth' | 'pro';
+  type: string;
   description: string;
   price: number;
   features: string[];
@@ -38,7 +37,6 @@ export default function SelectPackage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [packages, setPackages] = useState<Package[]>([]);
-  const [growingDbPackages, setGrowingDbPackages] = useState<GrowingPackage[]>([]);
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
   const [selectedAddOns, setSelectedAddOns] = useState<Record<string, number>>({});
   const [totalPrice, setTotalPrice] = useState<number>(0);
@@ -47,178 +45,88 @@ export default function SelectPackage() {
   const [businessStage, setBusinessStage] = useState<'new' | 'growing'>('new');
   const [dbAddOnsByPackageId, setDbAddOnsByPackageId] = useState<Record<string, DbAddOn[]>>({});
   const [dbDurationsByPackageId, setDbDurationsByPackageId] = useState<Record<string, DbDuration[]>>({});
-  const [growingUsesDb, setGrowingUsesDb] = useState(false);
 
   const [selectedDurationByPackageId, setSelectedDurationByPackageId] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    // Get the business stage from session storage
-    const stage = sessionStorage.getItem('onboarding_businessStage') as 'new' | 'growing' || 'new';
+    // Get the business stage from session storage (tetap disimpan untuk copy/label)
+    const stage = (sessionStorage.getItem('onboarding_businessStage') as 'new' | 'growing') || 'new';
     setBusinessStage(stage);
 
     const fetchPackages = async () => {
-      if (stage === 'growing') {
-        // Prefer DB-driven growing packages so Super Admin can manage them
-        try {
-          const { data, error } = await (supabase as any)
-            .from('packages')
-            .select('*')
-            .in('type', ['optimize', 'scale', 'dominate'])
-            .eq('is_active', true)
-            .order('price');
-
-          if (error) throw error;
-
-           const mapped: GrowingPackage[] = (data || []).map((pkg: any) => ({
-            id: pkg.id,
-            name: pkg.name,
-            type: pkg.type,
-            description: pkg.description,
-            price: pkg.price,
-            features: Array.isArray(pkg.features) ? pkg.features : JSON.parse((pkg.features as string) || '[]'),
-          }));
-
-            setGrowingDbPackages(mapped);
-            // If DB call succeeded, we must respect DB result (even if empty) so only Active packages appear.
-            setGrowingUsesDb(true);
-
-           // Load DB add-ons for growing packages
-           const pkgIds = mapped.map((p) => String(p.id)).filter(Boolean);
-           if (pkgIds.length > 0) {
-              const { data: addOnRows } = await (supabase as any)
-               .from('package_add_ons')
-                 .select('id,package_id,add_on_key,label,price_per_unit,unit_step,unit,sort_order,max_quantity')
-               .in('package_id', pkgIds)
-                .eq('is_active', true)
-                .order('sort_order', { ascending: true })
-                .order('created_at', { ascending: true });
-
-             const grouped: Record<string, DbAddOn[]> = {};
-             ((addOnRows as any[]) || []).forEach((r) => {
-               const pid = String(r.package_id);
-               if (!grouped[pid]) grouped[pid] = [];
-                grouped[pid].push({
-                  id: String(r.id),
-                  addOnKey: String(r.add_on_key),
-                 label: String(r.label),
-                 pricePerUnit: Number(r.price_per_unit ?? 0),
-                 unitStep: Number(r.unit_step ?? 1),
-                 unit: String(r.unit ?? 'unit'),
-                  maxQuantity: r.max_quantity === null || r.max_quantity === undefined ? null : Number(r.max_quantity),
-               });
-             });
-             setDbAddOnsByPackageId(grouped);
-           }
-
-            // Load durations for growing packages
-            if (pkgIds.length > 0) {
-              const { data: durationRows } = await (supabase as any)
-                .from('package_durations')
-                .select('id,package_id,duration_months,discount_percent,is_active,sort_order')
-                .in('package_id', pkgIds)
-                .eq('is_active', true)
-                .order('sort_order', { ascending: true })
-                .order('duration_months', { ascending: true });
-
-              const groupedDurations: Record<string, DbDuration[]> = {};
-              ((durationRows as any[]) || []).forEach((r) => {
-                const pid = String(r.package_id);
-                if (!groupedDurations[pid]) groupedDurations[pid] = [];
-                groupedDurations[pid].push({
-                  id: String(r.id),
-                  package_id: pid,
-                  duration_months: Number(r.duration_months ?? 1),
-                  discount_percent: Number(r.discount_percent ?? 0),
-                  is_active: Boolean(r.is_active ?? true),
-                  sort_order: Number(r.sort_order ?? 0),
-                });
-              });
-              setDbDurationsByPackageId(groupedDurations);
-            }
-        } catch (error) {
-          console.error('Error fetching growing packages:', error);
-          // Fallback to frontend-defined growing packages
-          setGrowingDbPackages([]);
-          setGrowingUsesDb(false);
-        } finally {
-          setIsLoading(false);
-        }
-        return;
-      }
-
+      setIsLoading(true);
       try {
+        // Tampilkan paket yang sama untuk semua stage: ambil semua packages aktif dari DB
         const { data, error } = await supabase
           .from('packages')
           .select('*')
-          .in('type', ['starter', 'growth', 'pro'])
           .eq('is_active', true)
           .order('price');
 
         if (error) throw error;
 
-         if (data) {
-           const mapped = data.map((pkg) => ({
-             ...pkg,
-             type: pkg.type as 'starter' | 'growth' | 'pro',
-             features: Array.isArray(pkg.features) ? (pkg.features as string[]) : JSON.parse((pkg.features as string) || '[]'),
-           }));
+        const mapped: Package[] = (data || []).map((pkg: any) => ({
+          id: String(pkg.id),
+          name: String(pkg.name),
+          type: String(pkg.type),
+          description: String(pkg.description ?? ''),
+          price: Number(pkg.price ?? 0),
+          features: Array.isArray(pkg.features) ? (pkg.features as string[]) : JSON.parse((pkg.features as string) || '[]'),
+        }));
 
-           setPackages(mapped);
+        setPackages(mapped);
 
-           // Load DB add-ons for new business packages
-           const pkgIds = mapped.map((p) => String((p as any).id)).filter(Boolean);
-           if (pkgIds.length > 0) {
-              const { data: addOnRows } = await (supabase as any)
-               .from('package_add_ons')
-                 .select('id,package_id,add_on_key,label,price_per_unit,unit_step,unit,sort_order,max_quantity')
-               .in('package_id', pkgIds)
-                .eq('is_active', true)
-                .order('sort_order', { ascending: true })
-                .order('created_at', { ascending: true });
+        // Load DB add-ons
+        const pkgIds = mapped.map((p) => String(p.id)).filter(Boolean);
+        if (pkgIds.length > 0) {
+          const { data: addOnRows } = await (supabase as any)
+            .from('package_add_ons')
+            .select('id,package_id,add_on_key,label,price_per_unit,unit_step,unit,sort_order,max_quantity')
+            .in('package_id', pkgIds)
+            .eq('is_active', true)
+            .order('sort_order', { ascending: true })
+            .order('created_at', { ascending: true });
 
-             const grouped: Record<string, DbAddOn[]> = {};
-             ((addOnRows as any[]) || []).forEach((r) => {
-               const pid = String(r.package_id);
-               if (!grouped[pid]) grouped[pid] = [];
-                grouped[pid].push({
-                  id: String(r.id),
-                  addOnKey: String(r.add_on_key),
-                 label: String(r.label),
-                 pricePerUnit: Number(r.price_per_unit ?? 0),
-                 unitStep: Number(r.unit_step ?? 1),
-                 unit: String(r.unit ?? 'unit'),
-                  maxQuantity: r.max_quantity === null || r.max_quantity === undefined ? null : Number(r.max_quantity),
-               });
-             });
-             setDbAddOnsByPackageId(grouped);
-           }
+          const grouped: Record<string, DbAddOn[]> = {};
+          ((addOnRows as any[]) || []).forEach((r) => {
+            const pid = String(r.package_id);
+            if (!grouped[pid]) grouped[pid] = [];
+            grouped[pid].push({
+              id: String(r.id),
+              addOnKey: String(r.add_on_key),
+              label: String(r.label),
+              pricePerUnit: Number(r.price_per_unit ?? 0),
+              unitStep: Number(r.unit_step ?? 1),
+              unit: String(r.unit ?? 'unit'),
+              maxQuantity: r.max_quantity === null || r.max_quantity === undefined ? null : Number(r.max_quantity),
+            });
+          });
+          setDbAddOnsByPackageId(grouped);
 
-            // Load durations for new business packages
-            if (pkgIds.length > 0) {
-              const { data: durationRows } = await (supabase as any)
-                .from('package_durations')
-                .select('id,package_id,duration_months,discount_percent,is_active,sort_order')
-                .in('package_id', pkgIds)
-                .eq('is_active', true)
-                .order('sort_order', { ascending: true })
-                .order('duration_months', { ascending: true });
+          // Load durations
+          const { data: durationRows } = await (supabase as any)
+            .from('package_durations')
+            .select('id,package_id,duration_months,discount_percent,is_active,sort_order')
+            .in('package_id', pkgIds)
+            .eq('is_active', true)
+            .order('sort_order', { ascending: true })
+            .order('duration_months', { ascending: true });
 
-              const groupedDurations: Record<string, DbDuration[]> = {};
-              ((durationRows as any[]) || []).forEach((r) => {
-                const pid = String(r.package_id);
-                if (!groupedDurations[pid]) groupedDurations[pid] = [];
-                groupedDurations[pid].push({
-                  id: String(r.id),
-                  package_id: pid,
-                  duration_months: Number(r.duration_months ?? 1),
-                  discount_percent: Number(r.discount_percent ?? 0),
-                  is_active: Boolean(r.is_active ?? true),
-                  sort_order: Number(r.sort_order ?? 0),
-                });
-              });
-              setDbDurationsByPackageId(groupedDurations);
-            }
-         }
+          const groupedDurations: Record<string, DbDuration[]> = {};
+          ((durationRows as any[]) || []).forEach((r) => {
+            const pid = String(r.package_id);
+            if (!groupedDurations[pid]) groupedDurations[pid] = [];
+            groupedDurations[pid].push({
+              id: String(r.id),
+              package_id: pid,
+              duration_months: Number(r.duration_months ?? 1),
+              discount_percent: Number(r.discount_percent ?? 0),
+              is_active: Boolean(r.is_active ?? true),
+              sort_order: Number(r.sort_order ?? 0),
+            });
+          });
+          setDbDurationsByPackageId(groupedDurations);
+        }
       } catch (error) {
         console.error('Error fetching packages:', error);
       } finally {
@@ -226,7 +134,7 @@ export default function SelectPackage() {
       }
     };
 
-    fetchPackages();
+    void fetchPackages();
   }, []);
 
   const handlePackageSelect = (pkgId: string, price: number, addOns: Record<string, number>) => {
@@ -315,73 +223,15 @@ export default function SelectPackage() {
         if (selClearErr) throw selClearErr;
       }
 
-      if (businessStage === 'new') {
-        // Create user package request (awaiting admin approval/payment)
-        const { error: packageError } = await (supabase as any).from('user_packages').insert({
-          user_id: user.id,
-          package_id: selectedPackage,
-          status: 'pending',
-          duration_months: Number(months) || 1,
-        });
+      // Create user package request (awaiting admin approval/payment)
+      const { error: packageError } = await (supabase as any).from('user_packages').insert({
+        user_id: user.id,
+        package_id: selectedPackage,
+        status: 'pending',
+        duration_months: Number(months) || 1,
+      });
 
-        if (packageError) throw packageError;
-      } else {
-        // Growing business packages
-        const selectedDbPkg = growingDbPackages.find((p) => p.id === selectedPackage);
-
-        if (selectedDbPkg) {
-          // DB-driven: selectedPackage is already the package_id
-          const { error: userPkgError } = await (supabase as any).from('user_packages').insert({
-            user_id: user.id,
-            package_id: selectedPackage,
-            status: 'pending',
-            duration_months: Number(months) || 1,
-          });
-          if (userPkgError) throw userPkgError;
-        } else {
-          // Fallback (legacy): frontend-defined growing packages; ensure DB row exists
-          const selectedGrowingPkg = growingPackages.find((p) => p.id === selectedPackage);
-          if (selectedGrowingPkg) {
-            const { data: existingPkg } = await supabase
-              .from('packages')
-              .select('id')
-              .eq('type', selectedGrowingPkg.type)
-              .eq('is_active', true)
-              .maybeSingle();
-
-            let packageId = existingPkg?.id;
-
-            if (!packageId) {
-              const { data: newPkg, error: createError } = await (supabase as any)
-                .from('packages')
-                .insert({
-                  name: selectedGrowingPkg.name,
-                  type: selectedGrowingPkg.type,
-                  description: selectedGrowingPkg.description,
-                  price: selectedGrowingPkg.price,
-                  features: selectedGrowingPkg.features,
-                  is_active: true,
-                })
-                .select('id')
-                .single();
-
-              if (createError) throw createError;
-              packageId = newPkg?.id;
-            }
-
-            if (!packageId) throw new Error('Failed to get or create package');
-
-            const { error: userPkgError } = await (supabase as any).from('user_packages').insert({
-              user_id: user.id,
-              package_id: packageId,
-              status: 'pending',
-              duration_months: Number(months) || 1,
-            });
-
-            if (userPkgError) throw userPkgError;
-          }
-        }
-      }
+      if (packageError) throw packageError;
 
       // Mark onboarding as completed
       const { error: businessError } = await supabase
@@ -404,9 +254,7 @@ export default function SelectPackage() {
       sessionStorage.removeItem('onboarding_city');
       sessionStorage.removeItem('onboarding_phoneNumber');
 
-      const packageName = businessStage === 'new'
-        ? packages.find(p => p.id === selectedPackage)?.name
-        : (growingDbPackages.find(p => p.id === selectedPackage)?.name || growingPackages.find(p => p.id === selectedPackage)?.name);
+      const packageName = packages.find((p) => p.id === selectedPackage)?.name;
 
       toast({
         title: 'Welcome aboard!',
@@ -434,8 +282,8 @@ export default function SelectPackage() {
     );
   }
 
-  const displayPackages =
-    businessStage === 'new' ? packages : (growingUsesDb ? growingDbPackages : growingPackages);
+  const displayPackages = packages;
+
   const getAddOns = (pkg: any) => {
     const pkgId = String(pkg?.id ?? '');
     const fromDb = pkgId && dbAddOnsByPackageId[pkgId];
