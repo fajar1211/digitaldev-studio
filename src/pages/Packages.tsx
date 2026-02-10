@@ -111,7 +111,16 @@ export default function Packages() {
   const [startUrlsMap, setStartUrlsMap] = useState<Record<string, string>>({});
   const [durationDiscountByPackageId, setDurationDiscountByPackageId] = useState<Record<string, number>>({});
   const [durationPlanYear1ByPackageId, setDurationPlanYear1ByPackageId] = useState<
-    Record<string, { basePriceIdr: number; discountPercent: number }>
+    Record<
+      string,
+      {
+        basePriceIdr: number;
+        discountPercent: number;
+        manualOverride: boolean;
+        overridePriceIdr: number | null;
+        finalPriceIdr: number | null;
+      }
+    >
   >({});
   const [loading, setLoading] = useState(true);
 
@@ -152,12 +161,29 @@ export default function Packages() {
         const list = Array.isArray(value) ? (value as any[]) : [];
         const years1 = list.find((r) => Number(r?.years) === 1);
         if (!years1) return null;
-        const baseRaw = years1?.base_price_idr ?? years1?.override_price_idr ?? years1?.price_usd;
+
+        const baseRaw = years1?.base_price_idr;
         const baseN = typeof baseRaw === "number" ? baseRaw : Number(baseRaw);
+
         const discRaw = years1?.discount_percent;
         const discN = typeof discRaw === "number" ? discRaw : Number(discRaw);
+
+        const manualOverride = typeof years1?.manual_override === "boolean" ? years1.manual_override : false;
+        const overrideRaw = years1?.override_price_idr;
+        const overrideN = overrideRaw === null || overrideRaw === undefined ? null : (typeof overrideRaw === "number" ? overrideRaw : Number(overrideRaw));
+
+        const finalRaw = years1?.price_usd;
+        const finalN = typeof finalRaw === "number" ? finalRaw : Number(finalRaw);
+
         if (!Number.isFinite(baseN)) return null;
-        return { basePriceIdr: Math.max(0, baseN), discountPercent: Number.isFinite(discN) ? discN : 0 };
+
+        return {
+          basePriceIdr: Math.max(0, baseN),
+          discountPercent: Number.isFinite(discN) ? discN : 0,
+          manualOverride,
+          overridePriceIdr: Number.isFinite(Number(overrideN)) ? Number(overrideN) : null,
+          finalPriceIdr: Number.isFinite(finalN) ? Math.max(0, finalN) : null,
+        };
       };
 
       const legacyYear1 = parseYear1Meta((legacyDurationPlanRes as any)?.data?.value);
@@ -214,7 +240,16 @@ export default function Packages() {
             .select("key,value")
             .in("key", keys);
 
-          const map: Record<string, { basePriceIdr: number; discountPercent: number }> = {};
+          const map: Record<
+            string,
+            {
+              basePriceIdr: number;
+              discountPercent: number;
+              manualOverride: boolean;
+              overridePriceIdr: number | null;
+              finalPriceIdr: number | null;
+            }
+          > = {};
           if (Array.isArray(rows)) {
             for (const r of rows as any[]) {
               const key = String(r?.key ?? "");
@@ -347,16 +382,22 @@ export default function Packages() {
                         <div className="mt-4">
                           {(() => {
                             const planMeta = durationPlanYear1ByPackageId[String(pkg.id)];
-                            const base = Number.isFinite(Number(planMeta?.basePriceIdr)) && Number(planMeta?.basePriceIdr) > 0
-                              ? Number(planMeta?.basePriceIdr)
-                              : Number(pkg.price ?? 0);
+
+                            const baseFromPlan = Number(planMeta?.basePriceIdr ?? NaN);
+                            const baseFallback = Number(pkg.price ?? 0);
+
+                            // Growth & Pro packages are monthly-based in Duration Plan; show yearly total on /packages.
+                            const isMonthlyBase = isCheckoutPlan;
+
+                            const base = Number.isFinite(baseFromPlan) && baseFromPlan > 0 ? baseFromPlan : baseFallback;
+                            const normalYear = isMonthlyBase ? Math.max(0, base * 12) : Math.max(0, base);
 
                             const discountPercent = Number.isFinite(Number(planMeta?.discountPercent))
                               ? Number(planMeta?.discountPercent)
                               : Number(durationDiscountByPackageId[String(pkg.id)] ?? 0);
 
-                            const shouldShowDurationPlan = planMeta && Number(base) > 0;
-                            if (!shouldShowDurationPlan) {
+                            const hasPlan = Boolean(planMeta) && normalYear > 0;
+                            if (!hasPlan) {
                               return (
                                 <span className="text-4xl font-bold text-foreground">
                                   Rp {Number(pkg.price ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 0 })}
@@ -364,7 +405,14 @@ export default function Packages() {
                               );
                             }
 
-                            const discounted = Math.max(0, base * (1 - discountPercent / 100));
+                            const manualFinal = planMeta?.manualOverride
+                              ? (planMeta.overridePriceIdr ?? planMeta.finalPriceIdr)
+                              : null;
+
+                            const discountedYear =
+                              typeof manualFinal === "number" && Number.isFinite(manualFinal)
+                                ? Math.max(0, manualFinal)
+                                : Math.max(0, normalYear * (1 - discountPercent / 100));
 
                             return (
                               <div className="space-y-2">
@@ -374,11 +422,11 @@ export default function Packages() {
                                 </div>
 
                                 <div className="text-sm text-muted-foreground line-through">
-                                  Harga Normal / tahun: Rp {base.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                                  Harga Normal / tahun: Rp {normalYear.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
                                 </div>
 
                                 <div className="text-4xl font-bold text-foreground">
-                                  Rp {discounted.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                                  Rp {discountedYear.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
                                   <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">/ tahun</span>
                                 </div>
                                 <div className="text-xs text-muted-foreground">Harga / tahun setelah diskon</div>
