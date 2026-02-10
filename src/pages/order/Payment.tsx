@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OrderLayout } from "@/components/order/OrderLayout";
 import { OrderSummaryCard } from "@/components/order/OrderSummaryCard";
 import { PaymentConfirmDialog } from "@/components/order/PaymentConfirmDialog";
+import { XenditPaymentMethodCard } from "@/components/order/XenditPaymentMethodCard";
 import { useOrder } from "@/contexts/OrderContext";
 import { useOrderPublicSettings } from "@/hooks/useOrderPublicSettings";
 import { useOrderAddOns } from "@/hooks/useOrderAddOns";
@@ -19,6 +20,7 @@ import { usePaypalOrderSettings } from "@/hooks/usePaypalOrderSettings";
 import { PayPalButtonsSection } from "@/components/order/PayPalButtonsSection";
 import { usePackageDurations } from "@/hooks/usePackageDurations";
 import { computeDiscountedTotal } from "@/lib/packageDurations";
+import { createXenditInvoice } from "@/lib/orderPayments";
 
 function formatIdr(value: number) {
   return `Rp ${Math.round(value).toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;
@@ -370,51 +372,19 @@ export default function Payment() {
 
     setPaying(true);
     try {
-      const { data, error } = await supabase.functions.invoke<{
-        ok: boolean;
-        invoice_url: string | null;
-        order_db_id: string | null;
-        error?: string;
-        xendit?: any;
-      }>("xendit-invoice-create", {
-        body: {
-          // IMPORTANT: Our UI + summary card display totals in IDR.
-          // Send the rounded IDR amount so invoice nominal matches "Total Harga".
-          amount_usd: totalAfterPromoIdr,
-          subscription_years: state.subscriptionYears,
-          promo_code: state.promoCode,
-          domain: state.domain,
-          selected_template_id: state.selectedTemplateId,
-          selected_template_name: state.selectedTemplateName,
-          customer_name: state.details.name,
-          customer_email: state.details.email,
-        },
+      const res = await createXenditInvoice({
+        amount_idr: totalAfterPromoIdr,
+        subscription_years: state.subscriptionYears ?? 0,
+        promo_code: state.promoCode,
+        domain: state.domain,
+        selected_template_id: state.selectedTemplateId ?? "",
+        selected_template_name: state.selectedTemplateName ?? "",
+        customer_name: state.details.name,
+        customer_email: state.details.email,
       });
 
-      // NOTE: When Edge Function returns non-2xx (e.g. 400), supabase-js places info in `error`.
-      // We want to show a friendly, actionable message instead of a technical "Edge function returned 400".
-      if (error) {
-        const raw = String((error as any)?.message ?? "");
-        const looksForbidden = /forbidden|REQUEST_FORBIDDEN_ERROR/i.test(raw);
-        const friendly = looksForbidden
-          ? "Xendit menolak request karena API Key tidak punya izin untuk membuat Invoice. Silakan atur permission API Key (akses Invoices/v2) atau buat Secret Key baru di Xendit Dashboard, lalu update di Super Admin → Integrations → Xendit."
-          : raw || t("order.tryAgain");
-
-        toast({ variant: "destructive", title: t("order.paymentFailedTitle"), description: friendly });
-        return;
-      }
-
-      if (!(data as any)?.ok) {
-        const msg = String((data as any)?.error ?? "").trim() || "Failed to create invoice";
-        toast({ variant: "destructive", title: t("order.paymentFailedTitle"), description: msg });
-        return;
-      }
-
-      if ((data as any)?.order_db_id) setLastOrderId(String((data as any).order_db_id));
-
-      const url = String((data as any)?.invoice_url ?? "").trim();
-      if (!url) throw new Error("Invoice URL not returned");
-      window.location.href = url;
+      if (res.orderDbId) setLastOrderId(res.orderDbId);
+      window.location.href = res.invoiceUrl;
     } catch (e: any) {
       toast({ variant: "destructive", title: t("order.paymentFailedTitle"), description: e?.message ?? t("order.tryAgain") });
     } finally {
@@ -453,18 +423,48 @@ export default function Payment() {
         ) : null}
 
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t("order.paymentMethod")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {gateway === "xendit" ? (
-              <div className="flex gap-2">
-                <Button type="button" variant="default" aria-disabled="true">
-                  Xendit
-                </Button>
-              </div>
-            ) : (
+        {gateway === "xendit" ? (
+          <XenditPaymentMethodCard
+            title={t("order.paymentMethod")}
+            promo={promo}
+            onPromoChange={setPromo}
+            applyingDisabled={paying}
+            onApplyPromo={async () => {
+              const code = promo.trim();
+              setPromoCode(code);
+              if (!code) {
+                setAppliedPromo(null);
+                toast({ title: t("order.promoCleared") });
+                return;
+              }
+              if (baseTotalUsd == null) {
+                setAppliedPromo(null);
+                toast({ variant: "destructive", title: t("order.unableApplyPromo"), description: t("order.totalNotAvailableYet") });
+                return;
+              }
+
+              const res = await validatePromoCode(code, baseTotalUsd);
+              if (!res.ok) {
+                setAppliedPromo(null);
+                toast({ variant: "destructive", title: t("order.invalidPromo"), description: t("order.promoNotFound") });
+                return;
+              }
+
+              setAppliedPromo({
+                id: res.promo.id,
+                code: res.promo.code,
+                promoName: res.promo.promo_name,
+                discountUsd: res.discountUsd,
+              });
+              toast({ title: t("order.promoApplied"), description: `${res.promo.promo_name} (-$${res.discountUsd.toFixed(2)})` });
+            }}
+          />
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{t("order.paymentMethod")}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="flex gap-2">
                 <Button type="button" variant={method === "card" ? "default" : "outline"} onClick={() => setMethod("card")}>
                   {t("order.card")}
@@ -481,151 +481,147 @@ export default function Payment() {
                   {t("order.bankTransfer")}
                 </Button>
               </div>
-            )}
 
-            {method === "paypal" ? (
-              <div className="rounded-lg border p-4 space-y-3">
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <div>
-                    <p className="font-medium text-foreground">PayPal</p>
-                    <p className="text-muted-foreground">Env: {paypal.env}</p>
+              {method === "paypal" ? (
+                <div className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <div>
+                      <p className="font-medium text-foreground">PayPal</p>
+                      <p className="text-muted-foreground">Env: {paypal.env}</p>
+                    </div>
+                    <span className="text-muted-foreground">{paypalButtonsEnabled ? t("common.ready") : t("order.paypalNotConfigured")}</span>
                   </div>
-                  <span className="text-muted-foreground">{paypalButtonsEnabled ? t("common.ready") : t("order.paypalNotConfigured")}</span>
-                </div>
 
-                {paypal.error ? <p className="text-sm text-muted-foreground">{paypal.error}</p> : null}
+                  {paypal.error ? <p className="text-sm text-muted-foreground">{paypal.error}</p> : null}
 
-                <PayPalButtonsSection
-                  disabled={!canComplete || paying || totalAfterPromoUsd == null || !paypalButtonsEnabled}
-                  payload={{
-                    amount_usd: totalAfterPromoUsd ?? 0,
-                    subscription_years: state.subscriptionYears ?? 0,
-                    promo_code: state.promoCode,
-                    domain: state.domain,
-                    selected_template_id: state.selectedTemplateId,
-                    selected_template_name: state.selectedTemplateName,
-                    customer_name: state.details.name,
-                    customer_email: state.details.email,
-                  }}
-                  onOrderDbId={(id) => setLastOrderId(id)}
-                  onSuccess={() => navigate("/payment/success")}
-                  onError={(msg) =>
-                    toast({
-                      variant: msg === "Canceled" ? "default" : "destructive",
-                      title: msg === "Canceled" ? t("order.cancel") : t("order.paymentFailedTitle"),
-                      description: msg === "Canceled" ? "" : msg,
-                    })
-                  }
-                />
+                  <PayPalButtonsSection
+                    disabled={!canComplete || paying || totalAfterPromoUsd == null || !paypalButtonsEnabled}
+                    payload={{
+                      amount_usd: totalAfterPromoUsd ?? 0,
+                      subscription_years: state.subscriptionYears ?? 0,
+                      promo_code: state.promoCode,
+                      domain: state.domain,
+                      selected_template_id: state.selectedTemplateId,
+                      selected_template_name: state.selectedTemplateName,
+                      customer_name: state.details.name,
+                      customer_email: state.details.email,
+                    }}
+                    onOrderDbId={(id) => setLastOrderId(id)}
+                    onSuccess={() => navigate("/payment/success")}
+                    onError={(msg) =>
+                      toast({
+                        variant: msg === "Canceled" ? "default" : "destructive",
+                        title: msg === "Canceled" ? t("order.cancel") : t("order.paymentFailedTitle"),
+                        description: msg === "Canceled" ? "" : msg,
+                      })
+                    }
+                  />
 
-                {lastOrderId ? (
-                  <p className="text-sm text-muted-foreground">
-                    Last order id: <span className="font-medium text-foreground">{lastOrderId}</span>
-                  </p>
-                ) : null}
-              </div>
-            ) : method === "card" ? (
-              <div className="rounded-lg border p-4 space-y-3">
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <div>
-                    <p className="font-medium text-foreground">
-                      {gateway === "xendit" ? "Xendit Invoice" : gateway === "midtrans" ? "Midtrans Card (3DS)" : "Card"}
+                  {lastOrderId ? (
+                    <p className="text-sm text-muted-foreground">
+                      Last order id: <span className="font-medium text-foreground">{lastOrderId}</span>
                     </p>
-                    {gateway === "midtrans" ? <p className="text-muted-foreground">Env: {midtrans.env}</p> : null}
-                  </div>
-                  <span className="text-muted-foreground">{gateway === "xendit" ? t("common.hosted") : midtrans.ready ? t("common.ready") : t("order.paypalNotConfigured")}</span>
+                  ) : null}
                 </div>
+              ) : method === "card" ? (
+                <div className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <div>
+                      <p className="font-medium text-foreground">{gateway === "midtrans" ? "Midtrans Card (3DS)" : "Card"}</p>
+                      {gateway === "midtrans" ? <p className="text-muted-foreground">Env: {midtrans.env}</p> : null}
+                    </div>
+                    <span className="text-muted-foreground">{gateway === "midtrans" ? (midtrans.ready ? t("common.ready") : t("order.paypalNotConfigured")) : t("common.ready")}</span>
+                  </div>
 
-                {gateway === "midtrans" ? (
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div className="md:col-span-2">
+                  {gateway === "midtrans" ? (
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="md:col-span-2">
+                        <Input
+                          value={cardNumber}
+                          onChange={(e) => setCardNumber(e.target.value)}
+                          placeholder={t("order.cardNumber")}
+                          inputMode="numeric"
+                          autoComplete="cc-number"
+                        />
+                      </div>
                       <Input
-                        value={cardNumber}
-                        onChange={(e) => setCardNumber(e.target.value)}
-                        placeholder={t("order.cardNumber")}
+                        value={expMonth}
+                        onChange={(e) => setExpMonth(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                        placeholder="MM"
                         inputMode="numeric"
-                        autoComplete="cc-number"
+                        autoComplete="cc-exp-month"
+                      />
+                      <Input
+                        value={expYear}
+                        onChange={(e) => setExpYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                        placeholder="YYYY"
+                        inputMode="numeric"
+                        autoComplete="cc-exp-year"
+                      />
+                      <Input
+                        value={cvv}
+                        onChange={(e) => setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                        placeholder="CVV"
+                        inputMode="numeric"
+                        autoComplete="cc-csc"
                       />
                     </div>
-                    <Input
-                      value={expMonth}
-                      onChange={(e) => setExpMonth(e.target.value.replace(/\D/g, "").slice(0, 2))}
-                      placeholder="MM"
-                      inputMode="numeric"
-                      autoComplete="cc-exp-month"
-                    />
-                    <Input
-                      value={expYear}
-                      onChange={(e) => setExpYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                      placeholder="YYYY"
-                      inputMode="numeric"
-                      autoComplete="cc-exp-year"
-                    />
-                    <Input
-                      value={cvv}
-                      onChange={(e) => setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                      placeholder="CVV"
-                      inputMode="numeric"
-                      autoComplete="cc-csc"
-                    />
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Kamu akan diarahkan ke halaman pembayaran Xendit (Invoice) untuk menyelesaikan pembayaran.</p>
-                )}
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Kamu akan diarahkan ke halaman pembayaran Xendit (Invoice) untuk menyelesaikan pembayaran.</p>
+                  )}
 
-                {gateway === "midtrans" && midtrans.error ? <p className="text-sm text-muted-foreground">{midtrans.error}</p> : null}
-                {lastOrderId ? (
-                  <p className="text-sm text-muted-foreground">
-                    Last order id: <span className="font-medium text-foreground">{lastOrderId}</span>
-                  </p>
-                ) : null}
+                  {gateway === "midtrans" && midtrans.error ? <p className="text-sm text-muted-foreground">{midtrans.error}</p> : null}
+                  {lastOrderId ? (
+                    <p className="text-sm text-muted-foreground">
+                      Last order id: <span className="font-medium text-foreground">{lastOrderId}</span>
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="rounded-lg border p-4 text-sm text-muted-foreground">Bank transfer flow can be added next. For now, please choose Card.</div>
+              )}
+
+              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                <Input value={promo} onChange={(e) => setPromo(e.target.value)} placeholder={t("order.promoCode")} />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={async () => {
+                    const code = promo.trim();
+                    setPromoCode(code);
+                    if (!code) {
+                      setAppliedPromo(null);
+                      toast({ title: t("order.promoCleared") });
+                      return;
+                    }
+                    if (baseTotalUsd == null) {
+                      setAppliedPromo(null);
+                      toast({ variant: "destructive", title: t("order.unableApplyPromo"), description: t("order.totalNotAvailableYet") });
+                      return;
+                    }
+
+                    const res = await validatePromoCode(code, baseTotalUsd);
+                    if (!res.ok) {
+                      setAppliedPromo(null);
+                      toast({ variant: "destructive", title: t("order.invalidPromo"), description: t("order.promoNotFound") });
+                      return;
+                    }
+
+                    setAppliedPromo({
+                      id: res.promo.id,
+                      code: res.promo.code,
+                      promoName: res.promo.promo_name,
+                      discountUsd: res.discountUsd,
+                    });
+                    toast({ title: t("order.promoApplied"), description: `${res.promo.promo_name} (-$${res.discountUsd.toFixed(2)})` });
+                  }}
+                >
+                  {t("order.apply")}
+                </Button>
               </div>
-            ) : (
-              <div className="rounded-lg border p-4 text-sm text-muted-foreground">
-                Bank transfer flow can be added next. For now, please choose Card.
-              </div>
-            )}
-
-            <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-              <Input value={promo} onChange={(e) => setPromo(e.target.value)} placeholder={t("order.promoCode")} />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={async () => {
-                  const code = promo.trim();
-                  setPromoCode(code);
-                  if (!code) {
-                    setAppliedPromo(null);
-                    toast({ title: t("order.promoCleared") });
-                    return;
-                  }
-                  if (baseTotalUsd == null) {
-                    setAppliedPromo(null);
-                    toast({ variant: "destructive", title: t("order.unableApplyPromo"), description: t("order.totalNotAvailableYet") });
-                    return;
-                  }
-
-                  const res = await validatePromoCode(code, baseTotalUsd);
-                  if (!res.ok) {
-                    setAppliedPromo(null);
-                    toast({ variant: "destructive", title: t("order.invalidPromo"), description: t("order.promoNotFound") });
-                    return;
-                  }
-
-                  setAppliedPromo({
-                    id: res.promo.id,
-                    code: res.promo.code,
-                    promoName: res.promo.promo_name,
-                    discountUsd: res.discountUsd,
-                  });
-                  toast({ title: t("order.promoApplied"), description: `${res.promo.promo_name} (-$${res.discountUsd.toFixed(2)})` });
-                }}
-              >
-                {t("order.apply")}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
