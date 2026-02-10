@@ -18,7 +18,8 @@ function formatIdr(value: number) {
 
 function isMonthlyPackageName(name: string | null) {
   const n = String(name ?? "").toLowerCase().trim();
-  return n === "full digital marketing" || n === "blog + social media";
+  // Accept variants with suffix like "/bulan" or extra spaces.
+  return n.includes("full digital marketing") || n.includes("blog + social media");
 }
 
 export default function Subscribe() {
