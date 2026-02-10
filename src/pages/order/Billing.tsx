@@ -153,7 +153,20 @@ export default function Billing() {
   };
 
   return (
-    <OrderLayout title="Billing" step="payment" flow="plan" sidebar={<OrderSummaryCard />}>
+    <OrderLayout
+      title="Billing"
+      step="payment"
+      flow="plan"
+      sidebar={
+        <OrderSummaryCard
+          hideDomain
+          hideStatus
+          hideTemplate
+          planLabelOverride="Durasi"
+          planValueOverride={state.selectedPackageName || "—"}
+        />
+      }
+    >
       <div className="space-y-6">
         <XenditPaymentMethodCard
           title={t("order.paymentMethod")}
@@ -209,8 +222,7 @@ export default function Billing() {
         </Card>
 
         <div className="flex items-center justify-between gap-3">
-          <Button type="button" variant="outline" onClick={() => navigate("/order/subscribe")}
-          >
+          <Button type="button" variant="outline" onClick={() => navigate("/order/subscribe")}>
             Kembali
           </Button>
           <PaymentConfirmDialog

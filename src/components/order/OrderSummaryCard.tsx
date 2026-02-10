@@ -12,11 +12,15 @@ export function OrderSummaryCard({
   hideDomain = false,
   hideStatus = false,
   hideTemplate = false,
+  planLabelOverride,
+  planValueOverride,
 }: {
   showEstPrice?: boolean;
   hideDomain?: boolean;
   hideStatus?: boolean;
   hideTemplate?: boolean;
+  planLabelOverride?: string;
+  planValueOverride?: string;
 }) {
   const { t, lang } = useI18n();
   const { state } = useOrder();
@@ -117,8 +121,8 @@ export function OrderSummaryCard({
           </div>
 
           <div className="flex items-center justify-between gap-3">
-            <span className="text-sm text-muted-foreground">{t("order.plan")}</span>
-            <span className="text-sm font-medium text-foreground">{yearsLabel}</span>
+            <span className="text-sm text-muted-foreground">{planLabelOverride ?? t("order.plan")}</span>
+            <span className="text-sm font-medium text-foreground">{planValueOverride ?? yearsLabel}</span>
           </div>
 
           {showEstPrice ? (
