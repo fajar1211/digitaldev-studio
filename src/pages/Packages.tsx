@@ -304,8 +304,9 @@ export default function Packages() {
                                   </div>
                                   <div className="text-4xl font-bold text-foreground">
                                     Rp {discounted.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
-                                    <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">/ 1 tahun</span>
+                                    <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">/ tahun</span>
                                   </div>
+                                  <div className="text-xs text-muted-foreground">Harga / tahun setelah diskon</div>
                                 </div>
                               );
                             })()
