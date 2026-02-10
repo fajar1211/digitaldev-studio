@@ -110,6 +110,7 @@ export default function Packages() {
   const [packages, setPackages] = useState<PublicPackageWithAddOns[]>([]);
   const [startUrlsMap, setStartUrlsMap] = useState<Record<string, string>>({});
   const [durationDiscountByPackageId, setDurationDiscountByPackageId] = useState<Record<string, number>>({});
+  const [websiteOnlyYearBasePriceIdr, setWebsiteOnlyYearBasePriceIdr] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   const justifyClass =
@@ -119,7 +120,7 @@ export default function Packages() {
     (async () => {
       const PACKAGES_START_URLS_FN = "packages-start-urls";
 
-      const [faqRes, pkgRes, addOnsRes, layoutRes, startUrlsRes] = await Promise.all([
+      const [faqRes, pkgRes, addOnsRes, layoutRes, startUrlsRes, durationPlanRes] = await Promise.all([
         supabase
           .from("website_faqs")
           .select("id,page,question,answer,sort_order,is_published,created_at,updated_at")
@@ -141,7 +142,20 @@ export default function Packages() {
           .order("created_at", { ascending: true }),
         (supabase as any).from("website_settings").select("value").eq("key", LAYOUT_SETTINGS_KEY).maybeSingle(),
         supabase.functions.invoke<{ ok: boolean; value?: Record<string, string> }>(PACKAGES_START_URLS_FN, { body: {} }),
+        (supabase as any).from("website_settings").select("value").eq("key", "order_subscription_plans").maybeSingle(),
       ]);
+
+      // Duration Plan base price (used as Harga Normal / Tahun for Website Only / Tahun)
+      try {
+        const v = (durationPlanRes as any)?.data?.value;
+        const list = Array.isArray(v) ? (v as any[]) : [];
+        const years1 = list.find((r) => Number(r?.years) === 1);
+        const base = years1?.base_price_idr;
+        const n = typeof base === "number" ? base : Number(base);
+        setWebsiteOnlyYearBasePriceIdr(Number.isFinite(n) ? n : null);
+      } catch {
+        setWebsiteOnlyYearBasePriceIdr(null);
+      }
 
       if (!faqRes.error) setFaqs((faqRes.data ?? []) as FaqRow[]);
 
@@ -294,7 +308,11 @@ export default function Packages() {
                         <div className="mt-4">
                           {String(pkg.id) === WEBSITE_ONLY_YEARLY_PACKAGE_ID && durationDiscountByPackageId[String(pkg.id)] != null ? (
                             (() => {
-                              const base = Number(pkg.price ?? 0);
+                              const baseFromDurationPlan = websiteOnlyYearBasePriceIdr;
+                              const base = Number.isFinite(Number(baseFromDurationPlan)) && Number(baseFromDurationPlan) > 0
+                                ? Number(baseFromDurationPlan)
+                                : Number(pkg.price ?? 0);
+
                               const discountPercent = Number(durationDiscountByPackageId[String(pkg.id)] ?? 0);
                               const discounted = Math.max(0, base * (1 - discountPercent / 100));
                               return (

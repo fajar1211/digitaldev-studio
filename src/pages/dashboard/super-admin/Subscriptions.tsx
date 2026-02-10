@@ -813,7 +813,7 @@ export default function SuperAdminSubscriptions() {
 
             <div className="grid gap-2 rounded-md border bg-muted/20 p-3 sm:grid-cols-12">
               <div className="sm:col-span-4">
-                <Label className="text-xs">Harga dasar / tahun</Label>
+                <Label className="text-xs">Harga Normal / Tahun</Label>
                 <Input
                   className="w-full"
                   value={String(baseYearMeta.value ?? 0)}
