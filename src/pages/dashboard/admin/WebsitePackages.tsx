@@ -1,5 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Check, Eye, EyeOff, RefreshCcw, Save, Star, StarOff, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Award,
+  Check,
+  Crown,
+  Eye,
+  EyeOff,
+  RefreshCcw,
+  Save,
+  Star,
+  StarOff,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -17,6 +30,8 @@ type PackageRow = {
   is_active: boolean;
   show_on_public: boolean;
   is_recommended?: boolean;
+  is_best_seller?: boolean;
+  is_vip?: boolean;
   created_at: string;
 };
 
@@ -76,7 +91,7 @@ export default function WebsitePackages() {
     try {
       const { data, error } = await supabase
         .from("packages")
-        .select("id,name,description,price,type,is_active,show_on_public,is_recommended,created_at")
+        .select("id,name,description,price,type,is_active,show_on_public,is_recommended,is_best_seller,is_vip,created_at")
         .eq("is_active", true)
         .order("created_at", { ascending: false });
 
@@ -150,15 +165,19 @@ export default function WebsitePackages() {
   }, []);
 
   const toggleShowOnPublic = (id: string) => {
-    setPackages((prev) =>
-      prev.map((pkg) => (pkg.id === id ? { ...pkg, show_on_public: !pkg.show_on_public } : pkg))
-    );
+    setPackages((prev) => prev.map((pkg) => (pkg.id === id ? { ...pkg, show_on_public: !pkg.show_on_public } : pkg)));
   };
 
   const toggleRecommended = (id: string) => {
-    setPackages((prev) =>
-      prev.map((pkg) => (pkg.id === id ? { ...pkg, is_recommended: !pkg.is_recommended } : pkg))
-    );
+    setPackages((prev) => prev.map((pkg) => (pkg.id === id ? { ...pkg, is_recommended: !pkg.is_recommended } : pkg)));
+  };
+
+  const toggleBestSeller = (id: string) => {
+    setPackages((prev) => prev.map((pkg) => (pkg.id === id ? { ...pkg, is_best_seller: !pkg.is_best_seller } : pkg)));
+  };
+
+  const toggleVip = (id: string) => {
+    setPackages((prev) => prev.map((pkg) => (pkg.id === id ? { ...pkg, is_vip: !pkg.is_vip } : pkg)));
   };
 
   const movePackage = (id: string, dir: "up" | "down") => {
@@ -190,13 +209,20 @@ export default function WebsitePackages() {
         id: pkg.id,
         show_on_public: pkg.show_on_public,
         is_recommended: !!pkg.is_recommended,
+        is_best_seller: !!pkg.is_best_seller,
+        is_vip: !!pkg.is_vip,
       }));
 
       const results = await Promise.all(
         updates.map((upd) =>
           supabase
             .from("packages")
-            .update({ show_on_public: upd.show_on_public, is_recommended: upd.is_recommended })
+            .update({
+              show_on_public: upd.show_on_public,
+              is_recommended: upd.is_recommended,
+              is_best_seller: upd.is_best_seller,
+              is_vip: upd.is_vip,
+            })
             .eq("id", upd.id)
         )
       );
@@ -314,7 +340,7 @@ export default function WebsitePackages() {
               <TableBody>
                 {packages.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground">
                       No packages found.
                     </TableCell>
                   </TableRow>
@@ -356,6 +382,32 @@ export default function WebsitePackages() {
                           <Badge variant="secondary">Inactive</Badge>
                         )}
                       </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleBestSeller(pkg.id)}
+                          disabled={!isEditing}
+                          className={pkg.is_best_seller ? "text-primary" : "text-muted-foreground"}
+                        >
+                          <Award className="h-4 w-4 mr-2" />
+                          {pkg.is_best_seller ? "Yes" : "No"}
+                        </Button>
+                      </TableCell>
+
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleVip(pkg.id)}
+                          disabled={!isEditing}
+                          className={pkg.is_vip ? "text-primary" : "text-muted-foreground"}
+                        >
+                          <Crown className="h-4 w-4 mr-2" />
+                          {pkg.is_vip ? "Yes" : "No"}
+                        </Button>
+                      </TableCell>
+
                       <TableCell className="text-right">
                         <Button
                           variant="ghost"
