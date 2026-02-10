@@ -194,7 +194,7 @@ export default function PackageOnboardingSettingsPanel({ packageId }: { packageI
             <div className="space-y-4">
               <div className="grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-12">
                 <div className="sm:col-span-5 grid gap-2">
-                  <Label>Harga dasar / bulan</Label>
+                  <Label>Harga Normal / Bulan</Label>
                   <Input
                     inputMode="numeric"
                     value={String(pkg.price ?? 0)}
