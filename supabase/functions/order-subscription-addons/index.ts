@@ -40,7 +40,8 @@ Deno.serve(async (req) => {
       .from("subscription_add_ons")
       .select("id,label,description,price_idr,is_active,sort_order")
       .eq("package_id", packageId)
-      .eq("is_active", true)
+      // Tampilkan add-ons yang aktif ATAU yang belum terisi flag is_active (NULL)
+      .or("is_active.eq.true,is_active.is.null")
       .order("sort_order", { ascending: true });
 
     if (error) throw error;
