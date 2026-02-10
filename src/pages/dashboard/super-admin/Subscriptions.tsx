@@ -496,7 +496,7 @@ export default function SuperAdminSubscriptions() {
             <span className="font-semibold">{selectedPackageName}</span>
           </CardTitle>
           <CardDescription>
-            Pilih package (mengikuti nama di halaman All Packages). Add-ons tersimpan per package, sedangkan Website Plans bersifat global.
+            Pilih package (mengikuti nama di halaman All Packages). Add-ons tersimpan per package, sedangkan Duration Plan bersifat global.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -524,12 +524,12 @@ export default function SuperAdminSubscriptions() {
 
       {isMarketingPackage ? <PackageOnboardingSettingsPanel packageId={pricingPackageId} /> : null}
 
-      {/* Website Plans - middle */}
+      {/* Duration Plan - middle */}
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <CardTitle>Website Plans</CardTitle>
+              <CardTitle>Duration Plan</CardTitle>
               <CardDescription>Manage “Choose plan duration” options on /order/subscription.</CardDescription>
             </div>
             <Badge variant="outline">Total: {plansCountLabel}</Badge>
