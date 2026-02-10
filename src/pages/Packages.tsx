@@ -114,6 +114,7 @@ export default function Packages() {
     Record<
       string,
       {
+        years: number;
         basePriceIdr: number;
         discountPercent: number;
         manualOverride: boolean;
@@ -157,27 +158,44 @@ export default function Packages() {
         (supabase as any).from("website_settings").select("value").eq("key", "order_subscription_plans").maybeSingle(),
       ]);
 
-      const parseYear1Meta = (value: unknown) => {
-        const list = Array.isArray(value) ? (value as any[]) : [];
-        const years1 = list.find((r) => Number(r?.years) === 1);
-        if (!years1) return null;
+      type DurationPlanMeta = {
+        years: number;
+        basePriceIdr: number;
+        discountPercent: number;
+        manualOverride: boolean;
+        overridePriceIdr: number | null;
+        finalPriceIdr: number | null;
+      };
 
-        const baseRaw = years1?.base_price_idr;
+      const parsePlanMeta = (value: unknown, yearsWanted: number): DurationPlanMeta | null => {
+        const list = Array.isArray(value) ? (value as any[]) : [];
+        const row = list.find((r) => Number(r?.years) === Number(yearsWanted));
+        if (!row) return null;
+
+        const baseRaw = row?.base_price_idr;
         const baseN = typeof baseRaw === "number" ? baseRaw : Number(baseRaw);
 
-        const discRaw = years1?.discount_percent;
+        const discRaw = row?.discount_percent;
         const discN = typeof discRaw === "number" ? discRaw : Number(discRaw);
 
-        const manualOverride = typeof years1?.manual_override === "boolean" ? years1.manual_override : false;
-        const overrideRaw = years1?.override_price_idr;
-        const overrideN = overrideRaw === null || overrideRaw === undefined ? null : (typeof overrideRaw === "number" ? overrideRaw : Number(overrideRaw));
+        const manualOverride = typeof row?.manual_override === "boolean" ? row.manual_override : false;
+        const overrideRaw = row?.override_price_idr;
+        const overrideN =
+          overrideRaw === null || overrideRaw === undefined
+            ? null
+            : typeof overrideRaw === "number"
+              ? overrideRaw
+              : Number(overrideRaw);
 
-        const finalRaw = years1?.price_usd;
+        // NOTE: historically this field name has been inconsistent in settings.
+        // We accept either final_price_idr or price_usd (legacy) as a numeric override.
+        const finalRaw = row?.final_price_idr ?? row?.price_usd;
         const finalN = typeof finalRaw === "number" ? finalRaw : Number(finalRaw);
 
         if (!Number.isFinite(baseN)) return null;
 
         return {
+          years: Number(yearsWanted),
           basePriceIdr: Math.max(0, baseN),
           discountPercent: Number.isFinite(discN) ? discN : 0,
           manualOverride,
@@ -186,7 +204,7 @@ export default function Packages() {
         };
       };
 
-      const legacyYear1 = parseYear1Meta((legacyDurationPlanRes as any)?.data?.value);
+      const legacyYear1 = parsePlanMeta((legacyDurationPlanRes as any)?.data?.value, 1);
 
       if (!faqRes.error) setFaqs((faqRes.data ?? []) as FaqRow[]);
 
@@ -230,9 +248,17 @@ export default function Packages() {
 
         setPackages(withAddOns);
 
-        // Duration Plan (Years=1) per package — source of truth for Harga Normal + Diskon% on /packages
+        // Duration Plan per package — source of truth for Harga Normal + Diskon% on /packages
+        // NOTE: Growth uses the 3-year discount plan (as configured in Duration Packages).
         try {
           const pkgIds = withAddOns.map((p) => String(p.id));
+          const pkgYearsWanted: Record<string, number> = {};
+          for (const p of withAddOns) {
+            const n = String(p.name ?? "").trim().toLowerCase();
+            const t = String(p.type ?? "").trim().toLowerCase();
+            pkgYearsWanted[String(p.id)] = n === "growth" || t === "growth" ? 3 : 1;
+          }
+
           const keys = pkgIds.map((id) => `order_subscription_plans:${id}`);
 
           const { data: rows } = await (supabase as any)
@@ -243,6 +269,7 @@ export default function Packages() {
           const map: Record<
             string,
             {
+              years: number;
               basePriceIdr: number;
               discountPercent: number;
               manualOverride: boolean;
@@ -250,13 +277,16 @@ export default function Packages() {
               finalPriceIdr: number | null;
             }
           > = {};
+
           if (Array.isArray(rows)) {
             for (const r of rows as any[]) {
               const key = String(r?.key ?? "");
               const value = r?.value;
               const pkgId = key.split(":")[1];
               if (!pkgId) continue;
-              const meta = parseYear1Meta(value);
+
+              const yearsWanted = Number(pkgYearsWanted[pkgId] ?? 1);
+              const meta = parsePlanMeta(value, yearsWanted);
               if (meta) map[pkgId] = meta;
             }
           }
@@ -386,17 +416,23 @@ export default function Packages() {
                             const baseFromPlan = Number(planMeta?.basePriceIdr ?? NaN);
                             const baseFallback = Number(pkg.price ?? 0);
 
-                            // Growth & Pro packages are monthly-based in Duration Plan; show yearly total on /packages.
+                            const isGrowth = n === "growth" || type === "growth";
+
+                            // Growth & Pro packages are monthly-based in Duration Plan.
                             const isMonthlyBase = isCheckoutPlan;
 
                             const base = Number.isFinite(baseFromPlan) && baseFromPlan > 0 ? baseFromPlan : baseFallback;
-                            const normalYear = isMonthlyBase ? Math.max(0, base * 12) : Math.max(0, base);
+                            const years = Math.max(1, Number(planMeta?.years ?? 1));
+
+                            // For monthly-based plans: total = base_per_month * 12 * years
+                            // For yearly-based plans: total = base_per_year * years
+                            const normalTotal = isMonthlyBase ? Math.max(0, base * 12 * years) : Math.max(0, base * years);
 
                             const discountPercent = Number.isFinite(Number(planMeta?.discountPercent))
                               ? Number(planMeta?.discountPercent)
                               : Number(durationDiscountByPackageId[String(pkg.id)] ?? 0);
 
-                            const hasPlan = Boolean(planMeta) && normalYear > 0;
+                            const hasPlan = Boolean(planMeta) && normalTotal > 0;
                             if (!hasPlan) {
                               return (
                                 <span className="text-4xl font-bold text-foreground">
@@ -405,14 +441,15 @@ export default function Packages() {
                               );
                             }
 
-                            const manualFinal = planMeta?.manualOverride
-                              ? (planMeta.overridePriceIdr ?? planMeta.finalPriceIdr)
-                              : null;
+                            const manualFinal = planMeta?.manualOverride ? (planMeta.overridePriceIdr ?? planMeta.finalPriceIdr) : null;
 
-                            const discountedYear =
+                            const discountedTotal =
                               typeof manualFinal === "number" && Number.isFinite(manualFinal)
                                 ? Math.max(0, manualFinal)
-                                : Math.max(0, normalYear * (1 - discountPercent / 100));
+                                : Math.max(0, normalTotal * (1 - discountPercent / 100));
+
+                            const suffix = isGrowth && years === 3 ? "/ 3 tahun" : "/ tahun";
+                            const afterLabel = isGrowth && years === 3 ? "Harga / 3 tahun setelah diskon" : "Harga / tahun setelah diskon";
 
                             return (
                               <div className="space-y-2">
@@ -422,14 +459,14 @@ export default function Packages() {
                                 </div>
 
                                 <div className="text-sm text-muted-foreground line-through">
-                                  Harga Normal / tahun: Rp {normalYear.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                                  {isGrowth ? "Harga Dapat berubah sewaktu waktu" : `Harga Normal / tahun: Rp ${normalTotal.toLocaleString("id-ID", { maximumFractionDigits: 0 })}`}
                                 </div>
 
                                 <div className="text-4xl font-bold text-foreground">
-                                  Rp {discountedYear.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
-                                  <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">/ tahun</span>
+                                  Rp {discountedTotal.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                                  <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">{suffix}</span>
                                 </div>
-                                <div className="text-xs text-muted-foreground">Harga / tahun setelah diskon</div>
+                                <div className="text-xs text-muted-foreground">{afterLabel}</div>
                               </div>
                             );
                           })()}
