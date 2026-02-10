@@ -41,8 +41,14 @@ export function OrderSummaryCard({
   const effectivePackageId = state.selectedPackageId ?? pricing.defaultPackageId ?? null;
   const { rows: durationRows } = usePackageDurations(effectivePackageId);
 
-  const { total: packageAddOnsTotal } = useOrderAddOns({ packageId: effectivePackageId, quantities: state.addOns ?? {} });
-  const { total: subscriptionAddOnsTotal } = useSubscriptionAddOns({ selected: state.subscriptionAddOns ?? {}, packageId: effectivePackageId });
+  const { items: packageAddOnItems, total: packageAddOnsTotal } = useOrderAddOns({
+    packageId: effectivePackageId,
+    quantities: state.addOns ?? {},
+  });
+  const { items: subscriptionAddOnItems, total: subscriptionAddOnsTotal } = useSubscriptionAddOns({
+    selected: state.subscriptionAddOns ?? {},
+    packageId: effectivePackageId,
+  });
   const addOnsTotal = packageAddOnsTotal + subscriptionAddOnsTotal;
 
   const formatIdr = (value: number) => {
@@ -151,6 +157,32 @@ export function OrderSummaryCard({
     const packageName = planValueOverride ?? state.selectedPackageName ?? "—";
     const durationValue = yearsLabel;
 
+    const addOnLines = (() => {
+      const lines: Array<{ key: string; label: string; price: number }> = [];
+
+      for (const a of packageAddOnItems || []) {
+        const qty = Number(state.addOns?.[a.id] ?? 0);
+        if (!Number.isFinite(qty) || qty <= 0) continue;
+        const subtotal = Number(a.price_per_unit ?? 0) * qty;
+        lines.push({
+          key: `pkg-${a.id}`,
+          label: `${a.label}${qty > 1 ? ` × ${qty}` : ""}`,
+          price: subtotal,
+        });
+      }
+
+      for (const a of subscriptionAddOnItems || []) {
+        if (!state.subscriptionAddOns?.[a.id]) continue;
+        lines.push({
+          key: `sub-${a.id}`,
+          label: a.label,
+          price: Number(a.price_idr ?? 0),
+        });
+      }
+
+      return lines.filter((l) => Number.isFinite(l.price) && l.price > 0);
+    })();
+
     return (
       <Card className="shadow-soft">
         <CardHeader className="pb-3">
@@ -174,6 +206,23 @@ export function OrderSummaryCard({
               <span className="text-sm text-muted-foreground">Durasi</span>
               <span className="text-sm font-medium text-foreground">{durationValue}</span>
             </div>
+
+            {addOnLines.length ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-muted-foreground">Add-ons</span>
+                  <span className="text-sm font-medium text-foreground">{formatIdr(addOnsTotal)}</span>
+                </div>
+                <ul className="space-y-1">
+                  {addOnLines.map((l) => (
+                    <li key={l.key} className="flex items-start justify-between gap-3">
+                      <span className="text-xs text-muted-foreground break-words">{l.label}</span>
+                      <span className="text-xs font-medium text-foreground tabular-nums">{formatIdr(l.price)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
             <div className="rounded-xl bg-muted/30 p-3">
               <p className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">{totalLabel}</p>
