@@ -224,15 +224,6 @@ export default function PackageOnboardingSettingsPanel({ packageId }: { packageI
                 </div>
               </div>
 
-              <PackageAddOnsEditor
-                value={addOns}
-                onChange={setAddOns}
-                onRemove={(idToRemove) =>
-                  setRemovedAddOnIds((prev) => (prev.includes(idToRemove) ? prev : [...prev, idToRemove]))
-                }
-                disabled={saving}
-              />
-
               <div className="space-y-3 rounded-lg border border-border p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -291,9 +282,7 @@ export default function PackageOnboardingSettingsPanel({ packageId }: { packageI
                               onChange={(e) => {
                                 const v = e.target.value === "" ? 0 : Number(e.target.value);
                                 setDurations((prev) =>
-                                  prev.map((x) =>
-                                    x === d ? { ...x, discount_percent: Number.isFinite(v) ? v : 0 } : x
-                                  )
+                                  prev.map((x) => (x === d ? { ...x, discount_percent: Number.isFinite(v) ? v : 0 } : x))
                                 );
                               }}
                             />
@@ -328,8 +317,7 @@ export default function PackageOnboardingSettingsPanel({ packageId }: { packageI
                               className="w-full"
                               disabled={saving}
                               onClick={() => {
-                                if (d.id)
-                                  setRemovedDurationIds((prev) => (prev.includes(d.id!) ? prev : [...prev, d.id!]));
+                                if (d.id) setRemovedDurationIds((prev) => (prev.includes(d.id!) ? prev : [...prev, d.id!]));
                                 setDurations((prev) => prev.filter((x) => x !== d));
                               }}
                             >
@@ -341,6 +329,15 @@ export default function PackageOnboardingSettingsPanel({ packageId }: { packageI
                   </div>
                 )}
               </div>
+
+              <PackageAddOnsEditor
+                value={addOns}
+                onChange={setAddOns}
+                onRemove={(idToRemove) =>
+                  setRemovedAddOnIds((prev) => (prev.includes(idToRemove) ? prev : [...prev, idToRemove]))
+                }
+                disabled={saving}
+              />
 
               <Button onClick={handleSave} disabled={!canSave || saving}>
                 {saving ? "Saving..." : "Save"}
