@@ -474,9 +474,13 @@ export default function Packages() {
                                   ? Math.max(0, base * (1 - discountPercent / 100))
                                   : Math.max(0, normalDisplay * (1 - discountPercent / 100));
 
+                            // For monthly marketing packages, the main headline should reflect "Harga Normal / Bulan"
+                            // as configured in Duration Plan.
+                            const headlineDisplay = isMonthlyBase ? normalDisplay : discountedDisplay;
+
                             const suffix = isMonthlyBase ? "/bulan" : isGrowth && years === 3 ? "/ 3 tahun" : "/ tahun";
                             const afterLabel = isMonthlyBase
-                              ? "Harga / bulan setelah diskon"
+                              ? "Harga Normal / Bulan"
                               : isGrowth && years === 3
                                 ? "Harga / 3 tahun setelah diskon"
                                 : "Harga / tahun setelah diskon";
@@ -497,7 +501,7 @@ export default function Packages() {
                                 </div>
 
                                 <div className="text-4xl font-bold text-foreground">
-                                  Rp {discountedDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                                  Rp {headlineDisplay.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
                                   <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">{suffix}</span>
                                 </div>
                                 <div className="text-xs text-muted-foreground">{afterLabel}</div>
