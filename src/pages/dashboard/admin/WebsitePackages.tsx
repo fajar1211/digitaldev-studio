@@ -86,7 +86,7 @@ export default function WebsitePackages() {
   const [baselineCardsAlign, setBaselineCardsAlign] = useState<PackagesCardsAlign>("center");
   const [packageOrder, setPackageOrder] = useState<string[] | null>(null);
 
-  const fetchPackages = async () => {
+  const fetchPackages = async (orderOverride?: string[] | null) => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -99,9 +99,10 @@ export default function WebsitePackages() {
 
       let next = ((data ?? []) as PackageRow[]).slice().sort(sortPackagesForPublic);
 
-      if (packageOrder && packageOrder.length) {
+      const orderToUse = orderOverride ?? packageOrder;
+      if (orderToUse && orderToUse.length) {
         const rank = new Map<string, number>();
-        packageOrder.forEach((id, idx) => rank.set(String(id), idx));
+        orderToUse.forEach((id, idx) => rank.set(String(id), idx));
         next = next.slice().sort((a, b) => {
           const ra = rank.has(a.id) ? (rank.get(a.id) as number) : Number.POSITIVE_INFINITY;
           const rb = rank.has(b.id) ? (rank.get(b.id) as number) : Number.POSITIVE_INFINITY;
@@ -119,7 +120,7 @@ export default function WebsitePackages() {
     }
   };
 
-  const fetchLayoutSettings = async () => {
+  const fetchLayoutSettings = async (): Promise<{ align: PackagesCardsAlign; order: string[] | null }> => {
     try {
       const { data, error } = await (supabase as any)
         .from("website_settings")
@@ -137,31 +138,22 @@ export default function WebsitePackages() {
       setBaselineCardsAlign(nextAlign);
       setPackageOrder(nextOrder);
 
-      if (nextOrder && nextOrder.length) {
-        const rank = new Map<string, number>();
-        nextOrder.forEach((id, idx) => rank.set(String(id), idx));
-        setPackages((prev) =>
-          prev.slice().sort((a, b) => {
-            const ra = rank.has(a.id) ? (rank.get(a.id) as number) : Number.POSITIVE_INFINITY;
-            const rb = rank.has(b.id) ? (rank.get(b.id) as number) : Number.POSITIVE_INFINITY;
-            if (ra !== rb) return ra - rb;
-            return sortPackagesForPublic(a, b);
-          })
-        );
-      }
-    } catch (err) {
+      // IMPORTANT: segera apply urutan dari DB saat load, tanpa menunggu state update.
+      await fetchPackages(nextOrder);
+
+      return { align: nextAlign, order: nextOrder };
+    } catch {
       // Jika belum ada settings, default ke center.
       setCardsAlign("center");
       setBaselineCardsAlign("center");
       setPackageOrder(null);
+      await fetchPackages(null);
+      return { align: "center", order: null };
     }
   };
 
   useEffect(() => {
-    (async () => {
-      await fetchLayoutSettings();
-      await fetchPackages();
-    })();
+    void fetchLayoutSettings();
   }, []);
 
   const toggleShowOnPublic = (id: string) => {
@@ -315,7 +307,7 @@ export default function WebsitePackages() {
               </CardDescription>
             </div>
 
-            <Button variant="outline" size="sm" onClick={fetchPackages} disabled={loading}>
+            <Button variant="outline" size="sm" onClick={() => fetchPackages()} disabled={loading}>
               <RefreshCcw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
