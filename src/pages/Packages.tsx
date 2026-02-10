@@ -48,6 +48,17 @@ type PackageAddOnRow = {
   updated_at?: string | null;
 };
 
+type PackageDurationRow = {
+  id?: string;
+  package_id: string;
+  duration_months: number;
+  discount_percent: number;
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 type PublicPackageRow = PackageRow & { is_recommended?: boolean };
 
 type PublicPackageWithAddOns = PublicPackageRow & { addOns: PackageAddOnRow[] };
@@ -61,6 +72,8 @@ const PUBLIC_PACKAGE_NAME_ORDER = [
   "dominate",
   "custom",
 ] as const;
+
+const WEBSITE_ONLY_YEARLY_PACKAGE_ID = "c92521ac-6813-4d62-b78f-13b49f83a8c9";
 
 function sortPackagesForPublic(p1: PublicPackageRow, p2: PublicPackageRow) {
   const a = (p1.name ?? "").trim().toLowerCase();
@@ -96,6 +109,7 @@ export default function Packages() {
   const [faqs, setFaqs] = useState<FaqRow[]>([]);
   const [packages, setPackages] = useState<PublicPackageWithAddOns[]>([]);
   const [startUrlsMap, setStartUrlsMap] = useState<Record<string, string>>({});
+  const [durationDiscountByPackageId, setDurationDiscountByPackageId] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
   const justifyClass =
@@ -170,6 +184,33 @@ export default function Packages() {
         }
 
         setPackages(withAddOns);
+
+        // Durations (for public price display)
+        try {
+          const pkgIds = withAddOns.map((p) => String(p.id));
+          if (pkgIds.length) {
+            const { data: durationsData } = await supabase
+              .from("package_durations")
+              .select("package_id,duration_months,discount_percent,is_active,sort_order")
+              .in("package_id", pkgIds)
+              .eq("is_active", true)
+              .order("sort_order", { ascending: true })
+              .order("duration_months", { ascending: true });
+
+            const map: Record<string, number> = {};
+            if (Array.isArray(durationsData)) {
+              for (const row of durationsData as any as PackageDurationRow[]) {
+                const pid = String(row.package_id);
+                if (Number(row.duration_months) === 12 && Number.isFinite(Number(row.discount_percent))) {
+                  map[pid] = Number(row.discount_percent);
+                }
+              }
+            }
+            setDurationDiscountByPackageId(map);
+          }
+        } catch {
+          setDurationDiscountByPackageId({});
+        }
 
         if (nextAlign === "left" || nextAlign === "center" || nextAlign === "right") {
           setCardsAlign(nextAlign);
@@ -251,9 +292,28 @@ export default function Packages() {
                         <CardDescription className="text-primary font-medium uppercase text-xs">{pkg.type}</CardDescription>
                         <CardTitle className="text-xl">{pkg.name}</CardTitle>
                         <div className="mt-4">
-                          <span className="text-4xl font-bold text-foreground">
-                            Rp {Number(pkg.price ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 0 })}
-                          </span>
+                          {String(pkg.id) === WEBSITE_ONLY_YEARLY_PACKAGE_ID && durationDiscountByPackageId[String(pkg.id)] != null ? (
+                            (() => {
+                              const base = Number(pkg.price ?? 0);
+                              const discountPercent = Number(durationDiscountByPackageId[String(pkg.id)] ?? 0);
+                              const discounted = Math.max(0, base * (1 - discountPercent / 100));
+                              return (
+                                <div className="space-y-1">
+                                  <div className="text-sm text-muted-foreground line-through">
+                                    Harga dasar / tahun: Rp {base.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                                  </div>
+                                  <div className="text-4xl font-bold text-foreground">
+                                    Rp {discounted.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                                    <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">/ 1 tahun</span>
+                                  </div>
+                                </div>
+                              );
+                            })()
+                          ) : (
+                            <span className="text-4xl font-bold text-foreground">
+                              Rp {Number(pkg.price ?? 0).toLocaleString("id-ID", { maximumFractionDigits: 0 })}
+                            </span>
+                          )}
                         </div>
                       </CardHeader>
                       <CardContent className="flex-1">
