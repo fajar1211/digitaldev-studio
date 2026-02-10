@@ -48,15 +48,17 @@ type PackageAddOnRow = {
   updated_at?: string | null;
 };
 
-type PackageDurationRow = {
-  id?: string;
-  package_id: string;
-  duration_months: number;
-  discount_percent: number;
-  is_active: boolean;
-  sort_order: number;
-  created_at?: string | null;
-  updated_at?: string | null;
+
+type SubscriptionPlanRow = {
+  years: number;
+  label?: string;
+  price_usd?: number;
+  base_price_idr?: number;
+  discount_percent?: number;
+  manual_override?: boolean;
+  override_price_idr?: number | null;
+  is_active?: boolean;
+  sort_order?: number;
 };
 
 type PublicPackageRow = PackageRow & { is_recommended?: boolean };
@@ -109,7 +111,7 @@ export default function Packages() {
   const [faqs, setFaqs] = useState<FaqRow[]>([]);
   const [packages, setPackages] = useState<PublicPackageWithAddOns[]>([]);
   const [startUrlsMap, setStartUrlsMap] = useState<Record<string, string>>({});
-  const [durationDiscountByPackageId, setDurationDiscountByPackageId] = useState<Record<string, number>>({});
+  const [websiteOnlyYearlyPricing, setWebsiteOnlyYearlyPricing] = useState<{ baseYear: number; discountPercent: number } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const justifyClass =
@@ -119,7 +121,9 @@ export default function Packages() {
     (async () => {
       const PACKAGES_START_URLS_FN = "packages-start-urls";
 
-      const [faqRes, pkgRes, addOnsRes, layoutRes, startUrlsRes] = await Promise.all([
+      const SETTINGS_SUBSCRIPTION_PLANS_KEY = "order_subscription_plans";
+
+      const [faqRes, pkgRes, addOnsRes, layoutRes, startUrlsRes, subscriptionPlansRes] = await Promise.all([
         supabase
           .from("website_faqs")
           .select("id,page,question,answer,sort_order,is_published,created_at,updated_at")
@@ -141,6 +145,7 @@ export default function Packages() {
           .order("created_at", { ascending: true }),
         (supabase as any).from("website_settings").select("value").eq("key", LAYOUT_SETTINGS_KEY).maybeSingle(),
         supabase.functions.invoke<{ ok: boolean; value?: Record<string, string> }>(PACKAGES_START_URLS_FN, { body: {} }),
+        (supabase as any).from("website_settings").select("value").eq("key", SETTINGS_SUBSCRIPTION_PLANS_KEY).maybeSingle(),
       ]);
 
       if (!faqRes.error) setFaqs((faqRes.data ?? []) as FaqRow[]);
@@ -185,31 +190,19 @@ export default function Packages() {
 
         setPackages(withAddOns);
 
-        // Durations (for public price display)
+        // Pricing khusus Website Only /Tahun: ambil dari setting Duration Packages (global)
         try {
-          const pkgIds = withAddOns.map((p) => String(p.id));
-          if (pkgIds.length) {
-            const { data: durationsData } = await supabase
-              .from("package_durations")
-              .select("package_id,duration_months,discount_percent,is_active,sort_order")
-              .in("package_id", pkgIds)
-              .eq("is_active", true)
-              .order("sort_order", { ascending: true })
-              .order("duration_months", { ascending: true });
+          const v = (subscriptionPlansRes as any)?.data?.value;
+          const rows: SubscriptionPlanRow[] = Array.isArray(v) ? (v as any) : [];
+          const oneYear = rows.find((r) => Number(r?.years) === 1 && r?.is_active !== false);
 
-            const map: Record<string, number> = {};
-            if (Array.isArray(durationsData)) {
-              for (const row of durationsData as any as PackageDurationRow[]) {
-                const pid = String(row.package_id);
-                if (Number(row.duration_months) === 12 && Number.isFinite(Number(row.discount_percent))) {
-                  map[pid] = Number(row.discount_percent);
-                }
-              }
-            }
-            setDurationDiscountByPackageId(map);
-          }
+          const baseYear = Number(oneYear?.base_price_idr ?? 0);
+          const discountPercentRaw = Number(oneYear?.discount_percent ?? 0);
+          const discountPercent = Math.max(0, Math.min(100, Number.isFinite(discountPercentRaw) ? discountPercentRaw : 0));
+
+          setWebsiteOnlyYearlyPricing({ baseYear: Math.max(0, baseYear), discountPercent });
         } catch {
-          setDurationDiscountByPackageId({});
+          setWebsiteOnlyYearlyPricing(null);
         }
 
         if (nextAlign === "left" || nextAlign === "center" || nextAlign === "right") {
@@ -292,10 +285,10 @@ export default function Packages() {
                         <CardDescription className="text-primary font-medium uppercase text-xs">{pkg.type}</CardDescription>
                         <CardTitle className="text-xl">{pkg.name}</CardTitle>
                         <div className="mt-4">
-                          {String(pkg.id) === WEBSITE_ONLY_YEARLY_PACKAGE_ID && durationDiscountByPackageId[String(pkg.id)] != null ? (
+                          {String(pkg.id) === WEBSITE_ONLY_YEARLY_PACKAGE_ID && websiteOnlyYearlyPricing ? (
                             (() => {
-                              const base = Number(pkg.price ?? 0);
-                              const discountPercent = Number(durationDiscountByPackageId[String(pkg.id)] ?? 0);
+                              const base = Number(websiteOnlyYearlyPricing.baseYear ?? 0);
+                              const discountPercent = Number(websiteOnlyYearlyPricing.discountPercent ?? 0);
                               const discounted = Math.max(0, base * (1 - discountPercent / 100));
                               return (
                                 <div className="space-y-1">
