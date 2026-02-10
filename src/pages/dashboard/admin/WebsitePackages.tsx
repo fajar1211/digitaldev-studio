@@ -328,11 +328,13 @@ export default function WebsitePackages() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Urutan</TableHead>
+                  <TableHead>Order</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>Active</TableHead>
+                  <TableHead className="text-right">Best Seller</TableHead>
+                  <TableHead className="text-right">VIP</TableHead>
                   <TableHead className="text-right">Recommended</TableHead>
                   <TableHead className="text-right">Show on Public</TableHead>
                 </TableRow>
@@ -371,7 +373,7 @@ export default function WebsitePackages() {
                       </TableCell>
                       <TableCell className="font-medium">{pkg.name}</TableCell>
                       <TableCell className="capitalize">{pkg.type}</TableCell>
-                      <TableCell>{pkg.price != null ? `$${Number(pkg.price).toFixed(2)}` : "—"}</TableCell>
+                      <TableCell>{formatIdr(pkg.price)}</TableCell>
                       <TableCell>
                         {pkg.is_active ? (
                           <Badge variant="default" className="gap-1">
