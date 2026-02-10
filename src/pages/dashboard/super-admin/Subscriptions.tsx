@@ -56,6 +56,11 @@ type DomainTldPriceDraft = {
 
 const SETTINGS_SUBSCRIPTION_PLANS_KEY = "order_subscription_plans";
 
+function getSubscriptionPlansKey(packageId?: string) {
+  const id = String(packageId ?? "").trim();
+  return id ? `${SETTINGS_SUBSCRIPTION_PLANS_KEY}:${id}` : SETTINGS_SUBSCRIPTION_PLANS_KEY;
+}
+
 // Keep ordering consistent with /dashboard/super-admin/all-packages
 const PACKAGE_TYPE_ORDER = ["starter", "growth", "pro", "optimize", "scale", "dominate"] as const;
 
@@ -206,16 +211,28 @@ export default function SuperAdminSubscriptions() {
     }
   };
 
-  const fetchPlans = async () => {
+  const fetchPlans = async (packageId?: string) => {
     setPlansLoading(true);
     try {
+      const key = getSubscriptionPlansKey(packageId);
       const { data: row } = await (supabase as any)
         .from("website_settings")
         .select("value")
-        .eq("key", SETTINGS_SUBSCRIPTION_PLANS_KEY)
+        .eq("key", key)
         .maybeSingle();
 
-      const v = row?.value;
+      // Backward compatible: if per-package key doesn't exist yet, fall back to the legacy global key.
+      const v = row?.value ?? (
+        key !== SETTINGS_SUBSCRIPTION_PLANS_KEY
+          ? (
+              await (supabase as any)
+                .from("website_settings")
+                .select("value")
+                .eq("key", SETTINGS_SUBSCRIPTION_PLANS_KEY)
+                .maybeSingle()
+            )?.data?.value
+          : undefined
+      );
       const parsed = Array.isArray(v)
         ? (v as any[])
             .map((r) => {
@@ -458,13 +475,13 @@ export default function SuperAdminSubscriptions() {
 
   useEffect(() => {
     fetchPackages();
-    fetchPlans();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!pricingPackageId) return;
 
+    fetchPlans(pricingPackageId);
     fetchAddOns(pricingPackageId);
 
     const selectedName = packages.find((p) => p.id === pricingPackageId)?.name ?? "";
@@ -541,7 +558,7 @@ export default function SuperAdminSubscriptions() {
 
       const { error } = await (supabase as any)
         .from("website_settings")
-        .upsert({ key: SETTINGS_SUBSCRIPTION_PLANS_KEY, value: payload }, { onConflict: "key" });
+        .upsert({ key: getSubscriptionPlansKey(pricingPackageId), value: payload }, { onConflict: "key" });
       if (error) throw error;
 
       toast({ title: "Saved", description: "Subscription plans updated." });
