@@ -1,1 +1,7 @@
 project_id = "supiwygxypfqjzoqmlaq"
+
+[functions.packages-start-urls]
+verify_jwt = false
+
+[functions.order-subscription-addons]
+verify_jwt = false
