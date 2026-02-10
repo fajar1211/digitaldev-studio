@@ -212,13 +212,13 @@ export const dict: Dict = {
   "blog.subscribe": { id: "Langganan", en: "Subscribe" },
 
   // About
-  "about.seoTitle": { id: "Tentang Kami | EasyMarketingAssist", en: "About Us | EasyMarketingAssist" },
+  "about.seoTitle": { id: "Tentang Kami | DigitalDev", en: "About Us | DigitalDev" },
   "about.seoDesc": { id: "Marketing yang personal — bekerja langsung dengan marketing assist.", en: "Marketing made personal — work directly with a dedicated marketing assist." },
   "about.heroTitleA": { id: "Marketing yang", en: "Marketing Made" },
   "about.heroTitleB": { id: "Personal", en: "Personal" },
   "about.heroSub": { id: "Kami percaya marketing yang baik tidak harus mahal atau rumit.", en: "We believe great marketing shouldn't require big budgets or complex agency relationships." },
   "about.storyTitle": { id: "Cerita Kami", en: "Our Story" },
-  "about.storyP1": { id: "EasyMarketingAssist lahir dari pengamatan sederhana: pemilik bisnis kecil tidak butuh agensi penuh. Mereka butuh orang khusus yang paham bisnisnya dan bisa mengerjakan marketing dengan efisien.", en: "EasyMarketingAssist was born from a simple observation: small business owners don't need a full agency. They need a dedicated person who understands their business and can handle marketing tasks efficiently." },
+  "about.storyP1": { id: "DigitalDev lahir dari pengamatan sederhana: pemilik bisnis kecil tidak butuh agensi penuh. Mereka butuh orang khusus yang paham bisnisnya dan bisa mengerjakan marketing dengan efisien.", en: "DigitalDev was born from a simple observation: small business owners don't need a full agency. They need a dedicated person who understands their business and can handle marketing tasks efficiently." },
   "about.storyP2": { id: "Kami mulai sebagai freelancer membantu bisnis lokal. Seiring waktu, kami sadar ada cara kerja yang lebih baik—lebih personal, lebih terjangkau, dan lebih efektif.", en: "We started as freelancers helping local businesses with their digital marketing. Over time, we realized there was a better way to work — one that's more personal, more affordable, and more effective." },
   "about.storyP3": { id: "Sekarang, kami menghubungkan pemilik bisnis dengan marketing assist terampil—kualitas seperti agensi, tapi dengan perhatian personal tanpa overhead.", en: "Today, we connect business owners with skilled marketing assists who provide the same quality of work you'd get from an agency, but with personal attention and without the overhead costs." },
   "about.diffTitle": { id: "Apa Bedanya Kami", en: "What Makes Us Different" },
