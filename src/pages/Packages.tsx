@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Check, Star } from "lucide-react";
+import { ArrowRight, Award, Check, Crown, Star } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 
@@ -419,14 +419,26 @@ export default function Packages() {
                     >
                       {(!!pkg.is_recommended || !!pkg.is_best_seller || !!pkg.is_vip) && (
                         <div className="absolute -top-3 left-1/2 flex -translate-x-1/2 flex-wrap items-center justify-center gap-2">
+                          {!!pkg.is_best_seller && (
+                            <Badge variant="secondary" className="gap-1 px-3 py-1 shadow-sm">
+                              <Award className="h-3.5 w-3.5" />
+                              Terlaris
+                            </Badge>
+                          )}
+
                           {!!pkg.is_recommended && (
-                            <Badge variant="default" className="gap-1">
+                            <Badge variant="default" className="gap-1 px-3 py-1 shadow-sm">
                               <Star className="h-3.5 w-3.5" />
                               {t("packages.recommended")}
                             </Badge>
                           )}
-                          {!!pkg.is_best_seller && <Badge variant="secondary">Best Seller</Badge>}
-                          {!!pkg.is_vip && <Badge variant="outline">VIP</Badge>}
+
+                          {!!pkg.is_vip && (
+                            <Badge variant="outline" className="gap-1 px-3 py-1 bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/50">
+                              <Crown className="h-3.5 w-3.5" />
+                              VIP
+                            </Badge>
+                          )}
                         </div>
                       )}
                       <CardHeader className="text-center pb-4">
