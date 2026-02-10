@@ -536,8 +536,6 @@ export default function SuperAdminSubscriptions() {
         </CardContent>
       </Card>
 
-      {isMarketingPackage ? <PackageOnboardingSettingsPanel packageId={pricingPackageId} /> : null}
-
       {/* Duration Plan - middle */}
       <Card>
         <CardHeader>
@@ -796,145 +794,155 @@ export default function SuperAdminSubscriptions() {
       </Card>
 
       {/* Add-ons (per package) */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <CardTitle>Add-ons</CardTitle>
-              <CardDescription>
-                Checklist add-ons yang tampil di bawah pilihan durasi pada /order/subscription (tersimpan per package).
-              </CardDescription>
+      {!isMarketingPackage ? (
+        <Card>
+          <CardHeader>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle>Add-ons</CardTitle>
+                <CardDescription>
+                  Checklist add-ons yang tampil di bawah pilihan durasi pada /order/subscription (tersimpan per package).
+                </CardDescription>
+              </div>
+              <Badge variant="outline">Total: {addOnsCountLabel}</Badge>
             </div>
-            <Badge variant="outline">Total: {addOnsCountLabel}</Badge>
-          </div>
-        </CardHeader>
+          </CardHeader>
 
-        <CardContent className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="text-xs text-muted-foreground">{isEditingAddOns ? "Edit mode: ON" : "Edit mode: OFF"}</div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setIsEditingAddOns((v) => !v)}
-              disabled={addOnsSaving}
-            >
-              {isEditingAddOns ? "Cancel" : "Edit"}
-            </Button>
-          </div>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs text-muted-foreground">{isEditingAddOns ? "Edit mode: ON" : "Edit mode: OFF"}</div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditingAddOns((v) => !v)}
+                disabled={addOnsSaving}
+              >
+                {isEditingAddOns ? "Cancel" : "Edit"}
+              </Button>
+            </div>
 
-          {addOnsLoading ? <div className="text-sm text-muted-foreground">Loading...</div> : null}
+            {addOnsLoading ? <div className="text-sm text-muted-foreground">Loading...</div> : null}
 
-          {!addOnsLoading && addOns.length ? (
-            <div className="space-y-3">
-              {addOns.map((a, idx) => (
-                <div key={a.id ?? `new-${idx}`} className="grid gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-12">
-                  <div className="md:col-span-3">
-                    <Label className="text-xs">Label</Label>
-                    <Input
-                      value={a.label}
-                      onChange={(e) => setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, label: e.target.value } : x)))}
-                      disabled={addOnsSaving || !isEditingAddOns}
-                      placeholder="e.g. Jasa Editing Website"
-                    />
-                  </div>
+            {!addOnsLoading && addOns.length ? (
+              <div className="space-y-3">
+                {addOns.map((a, idx) => (
+                  <div key={a.id ?? `new-${idx}`} className="grid gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-12">
+                    <div className="md:col-span-3">
+                      <Label className="text-xs">Label</Label>
+                      <Input
+                        value={a.label}
+                        onChange={(e) =>
+                          setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, label: e.target.value } : x)))
+                        }
+                        disabled={addOnsSaving || !isEditingAddOns}
+                        placeholder="e.g. Jasa Editing Website"
+                      />
+                    </div>
 
-                  <div className="md:col-span-4">
-                    <Label className="text-xs">Description</Label>
-                    <Textarea
-                      value={a.description}
-                      onChange={(e) => setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, description: e.target.value } : x)))}
-                      disabled={addOnsSaving || !isEditingAddOns}
-                      placeholder="Optional"
-                      rows={2}
-                    />
-                  </div>
+                    <div className="md:col-span-4">
+                      <Label className="text-xs">Description</Label>
+                      <Textarea
+                        value={a.description}
+                        onChange={(e) =>
+                          setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, description: e.target.value } : x)))
+                        }
+                        disabled={addOnsSaving || !isEditingAddOns}
+                        placeholder="Optional"
+                        rows={2}
+                      />
+                    </div>
 
-                  <div className="md:col-span-2">
-                    <Label className="text-xs">Price (IDR)</Label>
-                    <Input
-                      value={String(a.price_idr ?? 0)}
-                      onChange={(e) =>
-                        setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, price_idr: safeNumber(e.target.value) } : x)))
-                      }
-                      inputMode="numeric"
-                      disabled={addOnsSaving || !isEditingAddOns}
-                    />
-                  </div>
-
-                  <div className="md:col-span-1">
-                    <Label className="text-xs">Active</Label>
-                    <div className="pt-2">
-                      <Switch
-                        checked={Boolean(a.is_active)}
-                        onCheckedChange={(v) => setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, is_active: Boolean(v) } : x)))}
+                    <div className="md:col-span-2">
+                      <Label className="text-xs">Price (IDR)</Label>
+                      <Input
+                        value={String(a.price_idr ?? 0)}
+                        onChange={(e) =>
+                          setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, price_idr: safeNumber(e.target.value) } : x)))
+                        }
+                        inputMode="numeric"
                         disabled={addOnsSaving || !isEditingAddOns}
                       />
                     </div>
-                  </div>
 
-                  <div className="md:col-span-1">
-                    <Label className="text-xs">Sort</Label>
-                    <Input
-                      value={String(a.sort_order ?? idx)}
-                      onChange={(e) =>
-                        setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, sort_order: asNumber(e.target.value, idx) } : x)))
-                      }
-                      inputMode="numeric"
-                      disabled={addOnsSaving || !isEditingAddOns}
-                    />
-                  </div>
+                    <div className="md:col-span-1">
+                      <Label className="text-xs">Active</Label>
+                      <div className="pt-2">
+                        <Switch
+                          checked={Boolean(a.is_active)}
+                          onCheckedChange={(v) =>
+                            setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, is_active: Boolean(v) } : x)))
+                          }
+                          disabled={addOnsSaving || !isEditingAddOns}
+                        />
+                      </div>
+                    </div>
 
-                  <div className="md:col-span-1 flex items-end justify-end">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={async () => {
-                        const id = String(a.id ?? "");
-                        setAddOns((prev) => prev.filter((_, i) => i !== idx));
-                        if (id) await deleteAddOn(id);
-                      }}
-                      disabled={addOnsSaving || !isEditingAddOns}
-                      aria-label="Remove add-on"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="md:col-span-1">
+                      <Label className="text-xs">Sort</Label>
+                      <Input
+                        value={String(a.sort_order ?? idx)}
+                        onChange={(e) =>
+                          setAddOns((prev) => prev.map((x, i) => (i === idx ? { ...x, sort_order: asNumber(e.target.value, idx) } : x)))
+                        }
+                        inputMode="numeric"
+                        disabled={addOnsSaving || !isEditingAddOns}
+                      />
+                    </div>
+
+                    <div className="md:col-span-1 flex items-end justify-end">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={async () => {
+                          const id = String(a.id ?? "");
+                          setAddOns((prev) => prev.filter((_, i) => i !== idx));
+                          if (id) await deleteAddOn(id);
+                        }}
+                        disabled={addOnsSaving || !isEditingAddOns}
+                        aria-label="Remove add-on"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            ) : !addOnsLoading ? (
+              <div className="text-sm text-muted-foreground">No add-ons yet. Click “Add Add-on”.</div>
+            ) : null}
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  setAddOns((prev) => [
+                    ...prev,
+                    {
+                      label: "",
+                      description: "",
+                      price_idr: 0,
+                      is_active: true,
+                      sort_order: prev.length,
+                    },
+                  ])
+                }
+                disabled={addOnsSaving || !isEditingAddOns}
+              >
+                <Plus className="h-4 w-4 mr-2" /> Add Add-on
+              </Button>
+
+              <Button type="button" onClick={saveAddOns} disabled={addOnsSaving || !isEditingAddOns}>
+                <Save className="h-4 w-4 mr-2" /> Save
+              </Button>
             </div>
-          ) : !addOnsLoading ? (
-            <div className="text-sm text-muted-foreground">No add-ons yet. Click “Add Add-on”.</div>
-          ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
 
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                setAddOns((prev) => [
-                  ...prev,
-                  {
-                    label: "",
-                    description: "",
-                    price_idr: 0,
-                    is_active: true,
-                    sort_order: prev.length,
-                  },
-                ])
-              }
-              disabled={addOnsSaving || !isEditingAddOns}
-            >
-              <Plus className="h-4 w-4 mr-2" /> Add Add-on
-            </Button>
-
-            <Button type="button" onClick={saveAddOns} disabled={addOnsSaving || !isEditingAddOns}>
-              <Save className="h-4 w-4 mr-2" /> Save
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {isMarketingPackage ? <PackageOnboardingSettingsPanel packageId={pricingPackageId} /> : null}
     </div>
   );
 }
