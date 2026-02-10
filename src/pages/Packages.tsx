@@ -499,8 +499,8 @@ export default function Packages() {
                                   <span className="text-3xl md:text-4xl font-extrabold text-primary">{Math.round(discountPercent)}%</span>
                                 </div>
 
-                                <div className={isGrowth ? "text-sm text-muted-foreground" : "text-sm text-muted-foreground line-through"}>
-                                  {isGrowth ? "Harga Dapat berubah sewaktu waktu" : normalLabel}
+                                <div className={isGrowth || isPro ? "text-sm text-muted-foreground" : "text-sm text-muted-foreground line-through"}>
+                                  {isGrowth || isPro ? "Harga Dapat berubah sewaktu waktu" : normalLabel}
                                 </div>
 
                                 <div className="text-4xl font-bold text-foreground">
