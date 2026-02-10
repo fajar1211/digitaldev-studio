@@ -155,27 +155,6 @@ export default function Billing() {
   return (
     <OrderLayout title="Billing" step="payment" flow="plan" sidebar={<OrderSummaryCard />}>
       <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Ringkasan Checkout</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="text-sm">
-              <p className="text-muted-foreground">Plan</p>
-              <p className="font-medium text-foreground">{state.selectedPackageName || "—"}</p>
-            </div>
-            <div className="text-sm">
-              <p className="text-muted-foreground">Durasi</p>
-              <p className="font-medium text-foreground">{state.subscriptionYears ? `${state.subscriptionYears} Tahun` : "—"}</p>
-            </div>
-            <div className="text-sm">
-              <p className="text-muted-foreground">Kontak</p>
-              <p className="font-medium text-foreground">{state.details.name || "—"}</p>
-              <p className="text-muted-foreground">{state.details.email || ""}</p>
-            </div>
-          </CardContent>
-        </Card>
-
         <XenditPaymentMethodCard
           title={t("order.paymentMethod")}
           promo={promo}
