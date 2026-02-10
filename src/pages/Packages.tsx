@@ -292,9 +292,14 @@ export default function Packages() {
           }
 
           // fallback: if a package doesn't have its own plans yet, use legacy global config (if present)
+          // IMPORTANT: legacy global plans are yearly-based; do NOT apply them to monthly marketing packages (Growth/Pro).
           if (legacyYear1) {
-            for (const id of pkgIds) {
-              if (!map[id]) map[id] = legacyYear1;
+            for (const p of withAddOns) {
+              const id = String(p.id);
+              const n = String(p.name ?? "").trim().toLowerCase();
+              const t = String(p.type ?? "").trim().toLowerCase();
+              const isMonthlyBase = n === "growth" || n === "pro" || t === "growth" || t === "pro";
+              if (!isMonthlyBase && !map[id]) map[id] = legacyYear1;
             }
           }
 
@@ -315,11 +320,19 @@ export default function Packages() {
               .order("sort_order", { ascending: true })
               .order("duration_months", { ascending: true });
 
+            const yearsWantedById: Record<string, number> = {};
+            for (const p of withAddOns) {
+              const n = String(p.name ?? "").trim().toLowerCase();
+              const t = String(p.type ?? "").trim().toLowerCase();
+              yearsWantedById[String(p.id)] = n === "growth" || t === "growth" ? 3 : 1;
+            }
+
             const map: Record<string, number> = {};
             if (Array.isArray(durationsData)) {
               for (const row of durationsData as any as PackageDurationRow[]) {
                 const pid = String(row.package_id);
-                if (Number(row.duration_months) === 12 && Number.isFinite(Number(row.discount_percent))) {
+                const wantedMonths = Math.max(12, Number(yearsWantedById[pid] ?? 1) * 12);
+                if (Number(row.duration_months) === wantedMonths && Number.isFinite(Number(row.discount_percent))) {
                   map[pid] = Number(row.discount_percent);
                 }
               }
@@ -412,13 +425,25 @@ export default function Packages() {
                         <CardTitle className="text-xl">{pkg.name}</CardTitle>
                         <div className="mt-4">
                           {(() => {
-                            const planMeta = durationPlanYear1ByPackageId[String(pkg.id)];
+                            // Growth & Pro packages are monthly-based in Duration Plan.
+                            const isMonthlyBase = isCheckoutPlan;
+
+                            const planMetaFromSettings = durationPlanYear1ByPackageId[String(pkg.id)];
+                            const planMeta =
+                              planMetaFromSettings ??
+                              (isMonthlyBase
+                                ? {
+                                    years: isGrowth ? 3 : 1,
+                                    basePriceIdr: Number(pkg.price ?? 0),
+                                    discountPercent: Number(durationDiscountByPackageId[String(pkg.id)] ?? 0),
+                                    manualOverride: false,
+                                    overridePriceIdr: null,
+                                    finalPriceIdr: null,
+                                  }
+                                : undefined);
 
                             const baseFromPlan = Number(planMeta?.basePriceIdr ?? NaN);
                             const baseFallback = Number(pkg.price ?? 0);
-
-                            // Growth & Pro packages are monthly-based in Duration Plan.
-                            const isMonthlyBase = isCheckoutPlan;
 
                             // base = price per month (monthly) OR price per year (yearly)
                             const base = Number.isFinite(baseFromPlan) && baseFromPlan > 0 ? baseFromPlan : baseFallback;
