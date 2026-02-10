@@ -163,7 +163,7 @@ export default function Checkout() {
       title="Checkout"
       step="details"
       flow="plan"
-      sidebar={<OrderSummaryCard showEstPrice={false} hideDomain hideStatus hideTemplate />}
+      sidebar={<OrderSummaryCard variant="compact" hideDomain hideStatus hideTemplate />}
     >
       <Card>
         <CardHeader>

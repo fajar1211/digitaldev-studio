@@ -157,15 +157,7 @@ export default function Billing() {
       title="Billing"
       step="payment"
       flow="plan"
-      sidebar={
-        <OrderSummaryCard
-          hideDomain
-          hideStatus
-          hideTemplate
-          planLabelOverride="Durasi"
-          planValueOverride={state.selectedPackageName || "—"}
-        />
-      }
+      sidebar={<OrderSummaryCard variant="compact" hideDomain hideStatus hideTemplate />}
     >
       <div className="space-y-6">
         <XenditPaymentMethodCard

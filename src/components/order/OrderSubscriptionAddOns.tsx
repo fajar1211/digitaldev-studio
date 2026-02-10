@@ -11,7 +11,7 @@ function formatIdr(value: number) {
   return `Rp ${Math.round(value).toLocaleString("id-ID", { maximumFractionDigits: 0 })}`;
 }
 
-export function OrderSubscriptionAddOns() {
+export function OrderSubscriptionAddOns({ title = "Add-ons" }: { title?: string }) {
   const { state, setSubscriptionAddOnSelected } = useOrder();
   const { loading, items, total } = useSubscriptionAddOns({
     selected: state.subscriptionAddOns ?? {},
@@ -23,7 +23,7 @@ export function OrderSubscriptionAddOns() {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Add-ons</CardTitle>
+        <CardTitle className="text-base">{title}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {loading ? (

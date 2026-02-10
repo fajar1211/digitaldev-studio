@@ -80,7 +80,7 @@ export default function Subscribe() {
   const selected = state.subscriptionYears;
 
   return (
-    <OrderLayout title="Subscribe" step="plan" flow="plan" sidebar={<OrderSummaryCard />}>
+    <OrderLayout title="Subscribe" step="plan" flow="plan" sidebar={<OrderSummaryCard variant="compact" hideDomain hideStatus hideTemplate />}>
       <div className="space-y-6">
         <Card>
           <CardHeader className="pb-3">
@@ -143,7 +143,7 @@ export default function Subscribe() {
           </CardContent>
         </Card>
 
-        <OrderSubscriptionAddOns />
+        {isMonthly ? <OrderSubscriptionAddOns title="Add-ons (Onboarding)" /> : null}
 
         <div className="flex items-center justify-between gap-3">
           <Button type="button" variant="outline" onClick={() => navigate("/order/checkout")}>

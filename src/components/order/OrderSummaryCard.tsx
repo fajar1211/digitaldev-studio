@@ -14,6 +14,7 @@ export function OrderSummaryCard({
   hideTemplate = false,
   planLabelOverride,
   planValueOverride,
+  variant = "default",
 }: {
   showEstPrice?: boolean;
   hideDomain?: boolean;
@@ -21,6 +22,7 @@ export function OrderSummaryCard({
   hideTemplate?: boolean;
   planLabelOverride?: string;
   planValueOverride?: string;
+  variant?: "default" | "compact";
 }) {
   const { t, lang } = useI18n();
   const { state } = useOrder();
@@ -98,6 +100,39 @@ export function OrderSummaryCard({
     if (totalAfterPromoUsd == null) return "—";
     return formatIdr(totalAfterPromoUsd);
   })();
+
+  const effectiveEstTotalLabel = estTotalLabel ?? "—";
+
+  if (variant === "compact") {
+    const packageName = planValueOverride ?? state.selectedPackageName ?? "—";
+    const durationValue = yearsLabel;
+
+    return (
+      <Card className="shadow-soft">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">{t("order.summary")}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-muted-foreground">{t("order.amount")}</span>
+              <span className="text-sm font-semibold text-foreground">{effectiveEstTotalLabel}</span>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-muted-foreground">Durasi</span>
+              <span className="text-sm font-medium text-foreground">{durationValue}</span>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-muted-foreground">{planLabelOverride ?? "Paket"}</span>
+              <span className="text-sm font-medium text-foreground truncate max-w-[220px]">{packageName}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="shadow-soft">
