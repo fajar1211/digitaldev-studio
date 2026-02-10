@@ -111,6 +111,7 @@ export default function Packages() {
   const [startUrlsMap, setStartUrlsMap] = useState<Record<string, string>>({});
   const [durationDiscountByPackageId, setDurationDiscountByPackageId] = useState<Record<string, number>>({});
   const [websiteOnlyYearBasePriceIdr, setWebsiteOnlyYearBasePriceIdr] = useState<number | null>(null);
+  const [websiteOnlyYearDiscountPercent, setWebsiteOnlyYearDiscountPercent] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   const justifyClass =
@@ -145,16 +146,23 @@ export default function Packages() {
         (supabase as any).from("website_settings").select("value").eq("key", "order_subscription_plans").maybeSingle(),
       ]);
 
-      // Duration Plan base price (used as Harga Normal / Tahun for Website Only / Tahun)
+      // Duration Plan base+discount (Years=1) — source of truth for Website Only / Tahun
       try {
         const v = (durationPlanRes as any)?.data?.value;
         const list = Array.isArray(v) ? (v as any[]) : [];
         const years1 = list.find((r) => Number(r?.years) === 1);
-        const base = years1?.base_price_idr;
-        const n = typeof base === "number" ? base : Number(base);
-        setWebsiteOnlyYearBasePriceIdr(Number.isFinite(n) ? n : null);
+
+        // Backward compatible: some rows may only have price_usd (legacy)
+        const baseRaw = years1?.base_price_idr ?? years1?.override_price_idr ?? years1?.price_usd;
+        const baseN = typeof baseRaw === "number" ? baseRaw : Number(baseRaw);
+        setWebsiteOnlyYearBasePriceIdr(Number.isFinite(baseN) ? baseN : null);
+
+        const discRaw = years1?.discount_percent;
+        const discN = typeof discRaw === "number" ? discRaw : Number(discRaw);
+        setWebsiteOnlyYearDiscountPercent(Number.isFinite(discN) ? discN : 0);
       } catch {
         setWebsiteOnlyYearBasePriceIdr(null);
+        setWebsiteOnlyYearDiscountPercent(null);
       }
 
       if (!faqRes.error) setFaqs((faqRes.data ?? []) as FaqRow[]);
@@ -313,7 +321,9 @@ export default function Packages() {
                                 ? Number(baseFromDurationPlan)
                                 : Number(pkg.price ?? 0);
 
-                              const discountPercent = Number(durationDiscountByPackageId[String(pkg.id)] ?? 0);
+                              const discountPercent = Number(
+                                websiteOnlyYearDiscountPercent != null ? websiteOnlyYearDiscountPercent : durationDiscountByPackageId[String(pkg.id)] ?? 0,
+                              );
                               const discounted = Math.max(0, base * (1 - discountPercent / 100));
                               return (
                                 <div className="space-y-2">
