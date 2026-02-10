@@ -126,32 +126,26 @@ export function OrderSummaryCard({
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-muted-foreground">{planLabelOverride ?? "Paket"}</span>
+              <span className="text-sm font-medium text-foreground truncate max-w-[220px]">{packageName}</span>
+            </div>
+
             {isMonthly ? (
-              <>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm text-muted-foreground">{perMonthLabel}</span>
-                  <span className="text-sm font-semibold text-foreground">{perMonthValue}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm text-muted-foreground">{totalLabel}</span>
-                  <span className="text-sm font-semibold text-foreground">{effectiveEstTotalLabel}</span>
-                </div>
-              </>
-            ) : (
               <div className="flex items-center justify-between gap-3">
-                <span className="text-sm text-muted-foreground">{totalLabel}</span>
-                <span className="text-sm font-semibold text-foreground">{effectiveEstTotalLabel}</span>
+                <span className="text-sm text-muted-foreground">{perMonthLabel}</span>
+                <span className="text-sm font-semibold text-foreground">{perMonthValue}</span>
               </div>
-            )}
+            ) : null}
 
             <div className="flex items-center justify-between gap-3">
               <span className="text-sm text-muted-foreground">Durasi</span>
               <span className="text-sm font-medium text-foreground">{durationValue}</span>
             </div>
 
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm text-muted-foreground">{planLabelOverride ?? "Paket"}</span>
-              <span className="text-sm font-medium text-foreground truncate max-w-[220px]">{packageName}</span>
+            <div className="rounded-xl bg-muted/30 p-3">
+              <p className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">{totalLabel}</p>
+              <p className="mt-1 text-2xl font-bold text-foreground">{effectiveEstTotalLabel}</p>
             </div>
           </div>
         </CardContent>
