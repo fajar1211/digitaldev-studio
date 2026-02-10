@@ -225,37 +225,59 @@ export default function PackageOnboardingSettingsPanel({ packageId }: { packageI
               </div>
 
               <div className="space-y-3 rounded-lg border border-border p-4">
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-foreground">Duration & Discount</div>
-                    <div className="text-xs text-muted-foreground">
-                      Opsi durasi untuk onboarding (diskon dari total harga normal per bulan).
-                    </div>
+                    <h3 className="text-base font-semibold text-foreground">Duration & Discount</h3>
+                    <p className="text-xs text-muted-foreground">Opsi durasi untuk onboarding (diskon dari total harga normal per bulan).</p>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={saving}
-                    onClick={() => {
-                      const existing = new Set(durations.map((d) => Number(d.duration_months)));
-                      const missing = DEFAULT_DURATION_PRESETS.filter((p) => !existing.has(p.months));
-                      if (missing.length === 0) {
-                        toast({ title: "Info", description: "Preset durations sudah ada semua" });
-                        return;
-                      }
-                      setDurations((prev) => [
-                        ...prev,
-                        ...missing.map((m) => ({
-                          duration_months: m.months,
-                          discount_percent: m.discountPercent,
-                          is_active: true,
-                          sort_order: m.sortOrder,
-                        })),
-                      ]);
-                    }}
-                  >
-                    Add Preset (6/12/24/36)
-                  </Button>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={saving}
+                      onClick={() => {
+                        const existing = new Set(durations.map((d) => Number(d.duration_months)));
+                        const missing = DEFAULT_DURATION_PRESETS.filter((p) => !existing.has(p.months));
+                        if (missing.length === 0) {
+                          toast({ title: "Info", description: "Preset durations sudah ada semua" });
+                          return;
+                        }
+                        setDurations((prev) => [
+                          ...prev,
+                          ...missing.map((m) => ({
+                            duration_months: m.months,
+                            discount_percent: m.discountPercent,
+                            is_active: true,
+                            sort_order: m.sortOrder,
+                          })),
+                        ]);
+                      }}
+                    >
+                      Add Preset (6/12/24/36)
+                    </Button>
+
+                    {(() => {
+                      const n = String(pkg?.name ?? "")
+                        .toLowerCase()
+                        .replace(/\s+/g, " ")
+                        .trim();
+                      const isMarketingMonthly = n.includes("full digital marketing") || n.includes("blog + social media") || n.includes("blog+social media");
+                      if (!isMarketingMonthly) return null;
+
+                      return (
+                        <Button
+                          type="button"
+                          disabled={!canSave || saving}
+                          onClick={handleSave}
+                          aria-label="Simpan Duration & Discount"
+                          title="Simpan Duration & Discount"
+                        >
+                          {saving ? "Saving..." : "Simpan Duration"}
+                        </Button>
+                      );
+                    })()}
+                  </div>
                 </div>
 
                 {durations.length === 0 ? (
