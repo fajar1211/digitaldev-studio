@@ -83,7 +83,9 @@ export default function SubscriptionPlan() {
                       onClick={() => setSubscriptionYears(opt.years)}
                       className={cn(
                         "w-full rounded-xl border bg-card p-4 text-left shadow-soft transition will-change-transform",
-                        isSelected ? "ring-2 ring-ring bg-accent/30 shadow-lg scale-[1.01]" : "hover:bg-muted/30 hover:shadow",
+                        isSelected
+                          ? "border-primary/50 bg-primary/5 shadow-lg ring-2 ring-primary scale-[1.01]"
+                          : "hover:bg-muted/30 hover:shadow",
                       )}
                     >
                       <div className="flex items-start justify-between gap-3">

@@ -25,6 +25,7 @@ export default function ChooseDesign() {
   const { templates } = useOrderPublicSettings();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<OrderTemplate["category"] | "all">("all");
+  const [shuffleSeed, setShuffleSeed] = useState(() => Date.now());
 
   // Keep UI simple: 6 templates per page (matches the current perceived limit).
   const pageSize = 6;
@@ -46,15 +47,43 @@ export default function ChooseDesign() {
       const byQuery = !q ? true : tmplt.name.toLowerCase().includes(q);
       return byCategory && byQuery;
     });
+
+    // If user is browsing "all" templates without search, show them in random order each time.
+    if (category === "all" && !q) {
+      const seededRand = (s: number) => {
+        // LCG pseudo random [0,1)
+        const x = (s * 1664525 + 1013904223) % 4294967296;
+        return x / 4294967296;
+      };
+      const hashId = (id: string) => {
+        let h = 2166136261;
+        for (let i = 0; i < id.length; i++) {
+          h ^= id.charCodeAt(i);
+          h = Math.imul(h, 16777619);
+        }
+        return h >>> 0;
+      };
+
+      return [...list].sort((a, b) => {
+        const ra = seededRand((shuffleSeed + hashId(a.id)) >>> 0);
+        const rb = seededRand((shuffleSeed + hashId(b.id)) >>> 0);
+        return ra - rb;
+      });
+    }
+
     // Keep list stable and consistent with admin `sort_order` (no user-facing sort choices).
     return [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-  }, [category, query, templates]);
+  }, [category, query, templates, shuffleSeed]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
 
   useEffect(() => {
     // Reset to page 1 when filters change.
     setPage(1);
+
+    // New shuffle when browsing all templates without search.
+    const q = query.trim();
+    if (category === "all" && !q) setShuffleSeed(Date.now());
   }, [query, category]);
 
   useEffect(() => {
@@ -133,7 +162,12 @@ export default function ChooseDesign() {
             const previewImg = String((tmplt as any)?.preview_image_url ?? "").trim();
             const demoUrl = String(tmplt.preview_url ?? "").trim();
             return (
-              <Card key={tmplt.id} className={isSelected ? "ring-2 ring-ring" : ""}>
+              <Card
+                key={tmplt.id}
+                className={
+                  isSelected ? "border-primary/50 bg-primary/5 shadow-lg ring-2 ring-primary" : ""
+                }
+              >
                 <CardContent className="p-5">
                   <div className="mb-4 overflow-hidden rounded-md border bg-muted">
                     <AspectRatio ratio={16 / 9}>

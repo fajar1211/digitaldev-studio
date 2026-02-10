@@ -72,14 +72,6 @@ export function OrderSummaryCard({
     return `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(to)}`;
   })();
 
-  const durationLabel = state.subscriptionYears
-    ? lang === "id"
-      ? `Durasi ${state.subscriptionYears} Tahun`
-      : `Duration ${state.subscriptionYears} Year(s)`
-    : lang === "id"
-      ? "Durasi —"
-      : "Duration —";
-
   const yearsLabel = state.subscriptionYears
     ? lang === "id"
       ? `${state.subscriptionYears} tahun`
@@ -250,16 +242,34 @@ export function OrderSummaryCard({
             </div>
           ) : null}
 
+          {!hideStatus ? (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-muted-foreground">{t("order.status")}</span>
+              <span className="text-sm">
+                {state.domainStatus ? (
+                  <Badge variant={state.domainStatus === "available" ? "secondary" : "outline"}>{state.domainStatus}</Badge>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </span>
+            </div>
+          ) : null}
+
+          {!hideTemplate ? (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-muted-foreground">{t("order.template")}</span>
+              <span className="text-sm font-medium text-foreground truncate max-w-[220px]">{state.selectedTemplateName || "—"}</span>
+            </div>
+          ) : null}
+
           <div className="flex items-center justify-between gap-3">
-            <span className="text-sm text-muted-foreground">{durationLabel}</span>
-            <span className="text-sm font-medium text-foreground">
-              {durationPriceIdr == null ? "—" : formatIdr(durationPriceIdr)}
-            </span>
+            <span className="text-sm text-muted-foreground">Harga</span>
+            <span className="text-sm font-medium text-foreground">{durationPriceIdr == null ? "—" : formatIdr(durationPriceIdr)}</span>
           </div>
 
           <div className="flex items-center justify-between gap-3">
-            <span className="text-sm text-muted-foreground">{planLabelOverride ?? t("order.plan")}</span>
-            <span className="text-sm font-medium text-foreground">{planValueOverride ?? yearsLabel}</span>
+            <span className="text-sm text-muted-foreground">Paket</span>
+            <span className="text-sm font-medium text-foreground">{yearsLabel}</span>
           </div>
 
           {showEstPrice ? (
@@ -285,28 +295,6 @@ export function OrderSummaryCard({
                 </div>
               ) : null}
             </>
-          ) : null}
-
-          {!hideStatus ? (
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm text-muted-foreground">{t("order.status")}</span>
-              <span className="text-sm">
-                {state.domainStatus ? (
-                  <Badge variant={state.domainStatus === "available" ? "secondary" : "outline"}>{state.domainStatus}</Badge>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                )}
-              </span>
-            </div>
-          ) : null}
-
-          {!hideTemplate ? (
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm text-muted-foreground">{t("order.template")}</span>
-              <span className="text-sm font-medium text-foreground truncate max-w-[220px]">
-                {state.selectedTemplateName || "—"}
-              </span>
-            </div>
           ) : null}
         </div>
 
